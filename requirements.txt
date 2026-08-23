@@ -1,0 +1,7 @@
+# 22.8 is the first release that supports Python 3.14 — 21.x calls
+# asyncio.get_event_loop() in run_polling(), which raises on 3.14.
+python-telegram-bot==22.8
+groq==0.11.0
+httpx==0.27.2
+python-dotenv==1.0.1
+telethon==1.36.0
