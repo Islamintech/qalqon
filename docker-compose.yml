@@ -10,6 +10,12 @@ services:
     image: scamguard:latest
     container_name: scamguard-bot
     restart: unless-stopped
+    # Run as the host user that owns ./data. A bind mount keeps the HOST's
+    # ownership, so a container user the host does not know cannot write to it.
+    # Matching uids also keeps the database readable for backups from the host
+    # — which a root-owned or docker-volume-owned file would not be.
+    # Override with PUID/PGID if the deploying user is not uid 1000.
+    user: "${PUID:-1000}:${PGID:-1000}"
     env_file: .env
     environment:
       # Overrides whatever .env says: inside the container the database must
