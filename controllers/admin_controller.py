@@ -243,27 +243,36 @@ class AdminController:
             return
 
         bot = context.bot
+        # `overturned` records whether a human judged the bot WRONG. This is
+        # ground truth — the only unbiased signal of the false-positive rate,
+        # and it exists nowhere else. Everything else in the events table is the
+        # bot grading its own homework.
         if verb == VERB_BAN:
             await self._view.kick_user(bot, chat_id, user_id)
             await self._store.set_status(chat_id, user_id, STATUS_BANNED)
-            note = "banned 🚫"
+            note, event, overturned = "banned 🚫", "ADMIN_BAN", False
         elif verb == VERB_UNBAN:
             await self._view.unban_user(bot, chat_id, user_id)
             await self._store.set_status(chat_id, user_id, STATUS_NORMAL)
             await self._store.clear_strikes(chat_id, user_id)
-            note = "unbanned ♻️"
+            note, event, overturned = "unbanned ♻️", "ADMIN_UNBAN", True
         elif verb == VERB_IGNORE:
             # A false positive shouldn't leave a strike behind to escalate on.
             await self._store.clear_strikes(chat_id, user_id)
-            note = "ignored — strikes cleared 👌"
+            note, event, overturned = "ignored — strikes cleared 👌", "ADMIN_IGNORE", True
         elif verb == VERB_WHITELIST:
             await self._store.set_status(chat_id, user_id, STATUS_WHITELISTED)
-            note = "whitelisted ✅"
+            note, event, overturned = "whitelisted ✅", "ADMIN_WHITELIST", True
         else:
             await query.answer("unknown action")
             return
 
         by = update.effective_user
+        await self._store.log_event(
+            chat_id, user_id, event,
+            "OVERTURNED" if overturned else "CONFIRMED",
+            f"by admin {by.id} (@{by.username or '?'})",
+        )
         await query.answer(note)
         try:
             # Stamp the outcome onto the alert and drop the buttons, so the same

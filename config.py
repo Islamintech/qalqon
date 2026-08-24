@@ -90,6 +90,22 @@ class Settings:
     # so it is sent on a schedule regardless of activity. 0 disables it.
     heartbeat_interval: float = float(os.getenv("HEARTBEAT_INTERVAL", "86400"))
 
+    # --- read-only web dashboard (optional, separate process) ------------
+    # Telegram user ids allowed to view it. EMPTY DENIES EVERYONE — defaulting
+    # to open would mean a forgotten value silently publishes every moderation
+    # record, including users' message text.
+    web_admin_ids: frozenset = frozenset(
+        int(v) for v in os.getenv("WEB_ADMIN_IDS", "").replace(" ", "").split(",")
+        if v.strip().lstrip("-").isdigit()
+    )
+    # Your bot's @username, needed by the Telegram login widget.
+    web_bot_username: str = os.getenv("WEB_BOT_USERNAME", "")
+    # Public URL of the panel; must match the domain set via /setdomain.
+    web_base_url: str = os.getenv("WEB_BASE_URL", "http://localhost:8080")
+    # Leave empty to derive one from the bot token (rotating the token then
+    # invalidates every session).
+    web_session_secret: str = os.getenv("WEB_SESSION_SECRET", "")
+
     # Safety switch. When True the bot only REPORTS what it would do and never
     # actually deletes or bans. Keep this on until you trust the detection.
     dry_run: bool = os.getenv("DRY_RUN", "true").lower() == "true"

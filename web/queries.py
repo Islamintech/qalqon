@@ -1,0 +1,163 @@
+"""Read-only views over the moderation database.
+
+Opened with SQLite's `mode=ro` URI so the web process CANNOT write, no matter
+what a bug or a compromise there does. Moderation state is the bot's alone; the
+panel only looks. That is also why this does not import Store — reusing the
+writable class would make a stray write one typo away.
+
+Concurrency: SQLite readers do not block the bot's writes as long as WAL is on,
+which the bot enables. A reader may briefly see a slightly stale page; for a
+dashboard that is fine.
+"""
+import sqlite3
+import time
+from datetime import datetime, timezone
+
+DAY = 86400.0
+
+
+def connect(path: str) -> sqlite3.Connection:
+    conn = sqlite3.connect(f"file:{path}?mode=ro", uri=True, check_same_thread=False)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def _scope(chat_id: int | None) -> tuple[str, tuple]:
+    if chat_id is None:
+        return "WHERE 1=1", ()
+    return "WHERE chat_id = ?", (chat_id,)
+
+
+def overview(conn, chat_id: int | None = None) -> dict:
+    where, args = _scope(chat_id)
+    one = lambda sql, a=(): conn.execute(sql, a).fetchone()[0]
+    return {
+        "users": one(f"SELECT COUNT(*) FROM users {where}", args),
+        "whitelisted": one(
+            f"SELECT COUNT(*) FROM users {where} AND status='whitelisted'", args
+        ),
+        "banned": one(f"SELECT COUNT(*) FROM users {where} AND status='banned'", args),
+        "active_strikes": one(f"SELECT COUNT(*) FROM strikes {where}", args),
+        "events": one(f"SELECT COUNT(*) FROM events {where}", args),
+        "messages_seen": one(
+            f"SELECT COALESCE(SUM(messages_seen),0) FROM users {where}", args
+        ),
+    }
+
+
+def actions_by_type(conn, chat_id: int | None = None, days: int = 30) -> dict[str, int]:
+    where, args = _scope(chat_id)
+    since = time.time() - days * DAY
+    rows = conn.execute(
+        f"SELECT action, COUNT(*) c FROM events {where} AND ts >= ? "
+        f"AND action IN ('REVIEW','DELETE','BAN') GROUP BY action",
+        (*args, since),
+    ).fetchall()
+    return {r["action"]: r["c"] for r in rows}
+
+
+def daily_activity(conn, chat_id: int | None = None, days: int = 14) -> list[dict]:
+    """One row per day, oldest first. Days with nothing are included as zeroes —
+    a gap in a chart reads as missing data, not as a quiet day."""
+    where, args = _scope(chat_id)
+    since = time.time() - days * DAY
+    rows = conn.execute(
+        f"SELECT ts, action FROM events {where} AND ts >= ? "
+        f"AND action IN ('REVIEW','DELETE','BAN')",
+        (*args, since),
+    ).fetchall()
+
+    buckets: dict[str, dict[str, int]] = {}
+    for i in range(days):
+        day = datetime.fromtimestamp(
+            time.time() - (days - 1 - i) * DAY, tz=timezone.utc
+        ).strftime("%Y-%m-%d")
+        buckets[day] = {"REVIEW": 0, "DELETE": 0, "BAN": 0}
+    for r in rows:
+        day = datetime.fromtimestamp(r["ts"], tz=timezone.utc).strftime("%Y-%m-%d")
+        if day in buckets:
+            buckets[day][r["action"]] = buckets[day].get(r["action"], 0) + 1
+    return [{"day": d, **counts} for d, counts in buckets.items()]
+
+
+def accuracy(conn, chat_id: int | None = None) -> dict:
+    """How often a human overturned the bot.
+
+    IMPORTANT: reviewed cases are a biased sample — nobody taps a button on the
+    obviously-correct ones — so this is an UPPER BOUND on the false-positive
+    rate, not a measurement of it. The template must say so; a number presented
+    without that caveat would be trusted more than it deserves.
+    """
+    where, args = _scope(chat_id)
+    row = conn.execute(
+        f"SELECT SUM(risk='OVERTURNED') o, SUM(risk='CONFIRMED') c "
+        f"FROM events {where} AND action LIKE 'ADMIN_%'",
+        args,
+    ).fetchone()
+    overturned, confirmed = row["o"] or 0, row["c"] or 0
+    reviewed = overturned + confirmed
+    acted = conn.execute(
+        f"SELECT COUNT(*) FROM events {where} AND action IN ('REVIEW','DELETE','BAN')",
+        args,
+    ).fetchone()[0]
+    return {
+        "bot_actions": acted,
+        "reviewed": reviewed,
+        "overturned": overturned,
+        "confirmed": confirmed,
+        "overturn_rate": (overturned / reviewed) if reviewed else None,
+        "unreviewed": max(acted - reviewed, 0),
+    }
+
+
+def per_chat(conn) -> list[dict]:
+    rows = conn.execute(
+        "SELECT chat_id, COUNT(*) AS events, "
+        "  SUM(action='BAN') AS bans, "
+        "  SUM(action='DELETE') AS deletes, "
+        "  SUM(action='REVIEW') AS reviews, "
+        "  MAX(ts) AS last "
+        "FROM events WHERE action IN ('REVIEW','DELETE','BAN') "
+        "GROUP BY chat_id ORDER BY events DESC"
+    ).fetchall()
+    out = []
+    for r in rows:
+        users = conn.execute(
+            "SELECT COUNT(*) FROM users WHERE chat_id=?", (r["chat_id"],)
+        ).fetchone()[0]
+        out.append({**dict(r), "users": users})
+    return out
+
+
+def recent_events(conn, chat_id: int | None = None, limit: int = 60) -> list[dict]:
+    where, args = _scope(chat_id)
+    rows = conn.execute(
+        f"SELECT e.ts, e.chat_id, e.user_id, e.action, e.risk, e.reason, e.text, "
+        f"  COALESCE(u.username,'') AS username "
+        f"FROM events e LEFT JOIN users u "
+        f"  ON u.chat_id = e.chat_id AND u.user_id = e.user_id "
+        f"{where.replace('chat_id', 'e.chat_id')} ORDER BY e.ts DESC LIMIT ?",
+        (*args, limit),
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def top_offenders(conn, limit: int = 10) -> list[dict]:
+    rows = conn.execute(
+        "SELECT chat_id, user_id, username, strikes AS lifetime, status, messages_seen "
+        "FROM users WHERE strikes > 0 ORDER BY strikes DESC LIMIT ?",
+        (limit,),
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def health(conn) -> dict:
+    """Last time the bot wrote anything. Not a substitute for the heartbeat —
+    a quiet chat also produces no writes — but a long gap alongside busy groups
+    is worth seeing."""
+    row = conn.execute("SELECT MAX(ts) AS last FROM events").fetchone()
+    last = row["last"]
+    return {
+        "last_event": last,
+        "seconds_since": (time.time() - last) if last else None,
+    }

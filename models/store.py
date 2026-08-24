@@ -123,6 +123,12 @@ class Store:
         def _open() -> sqlite3.Connection:
             conn = sqlite3.connect(self._path, check_same_thread=False)
             conn.row_factory = sqlite3.Row
+            # WAL lets a reader (the web dashboard) run concurrently with the
+            # bot's writes instead of the two blocking each other. It also
+            # survives an unclean shutdown better, which matters under
+            # Restart=always.
+            conn.execute("PRAGMA journal_mode=WAL")
+            conn.execute("PRAGMA synchronous=NORMAL")
             conn.executescript(_SCHEMA)
             _migrate(conn)
             conn.commit()
@@ -229,6 +235,49 @@ class Store:
             }
 
         return await self._run(_stats, chat_id, cutoff)
+
+    async def accuracy(self, chat_id: int | None = None) -> dict:
+        """How often a human overturned the bot.
+
+        The bot grading its own homework tells you nothing. An admin tapping
+        Ignore / Unban / Whitelist on an alert is a person saying the decision
+        was WRONG; tapping Ban is a person saying it was right. That is the only
+        unbiased signal of the false-positive rate available, which is what
+        decides whether the thresholds are safe to enforce with.
+
+        Reviewed cases are a biased sample — nobody clicks anything on the ones
+        that were obviously correct — so `overturn_rate` is an upper bound on
+        the false-positive rate, not a measurement of it. Treat it as
+        directional.
+        """
+
+        def _acc(conn, chat_id):
+            scope = "WHERE chat_id = ?" if chat_id is not None else "WHERE 1=1"
+            args: tuple = (chat_id,) if chat_id is not None else ()
+            row = conn.execute(
+                f"SELECT "
+                f"  SUM(risk = 'OVERTURNED') AS overturned, "
+                f"  SUM(risk = 'CONFIRMED')  AS confirmed "
+                f"FROM events {scope} AND action LIKE 'ADMIN_%'",
+                args,
+            ).fetchone()
+            overturned = row["overturned"] or 0
+            confirmed = row["confirmed"] or 0
+            reviewed = overturned + confirmed
+            acted = conn.execute(
+                f"SELECT COUNT(*) FROM events {scope} "
+                f"AND action IN ('REVIEW','DELETE','BAN')",
+                args,
+            ).fetchone()[0]
+            return {
+                "bot_actions": acted,
+                "human_reviewed": reviewed,
+                "overturned": overturned,
+                "confirmed": confirmed,
+                "overturn_rate": (overturned / reviewed) if reviewed else None,
+            }
+
+        return await self._run(_acc, chat_id)
 
     # --- writes ----------------------------------------------------------
     async def touch(self, chat_id: int, user_id: int, username: str = "") -> UserRecord:

@@ -1,0 +1,5 @@
+# Optional: the read-only dashboard (web/). The bot itself does not need these,
+# so it stays lean if you never run the panel.
+-r requirements.txt
+fastapi==0.115.6
+uvicorn[standard]==0.34.0

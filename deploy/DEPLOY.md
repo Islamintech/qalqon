@@ -152,3 +152,82 @@ In order of reliability:
 If you want a machine to watch it instead of you, point the heartbeat at a free
 uptime monitor (healthchecks.io and similar) — that also detects the VPS itself
 going away, which nothing running *on* the VPS can.
+
+---
+
+# The dashboard (optional)
+
+A read-only web panel: statistics, per-group breakdown, recent decisions, and
+how often a human overturned the bot.
+
+It runs as a **separate process** that opens the database **read-only**, so a
+bug or compromise in the web layer cannot corrupt moderation state, and the
+panel can crash without interrupting moderation.
+
+**It renders real users' message text.** That is necessary for judging whether
+a flag was a false positive, but it makes the panel as sensitive as the groups
+it watches. HTTPS and a tight allow-list are not optional.
+
+## 1. Extra dependencies
+
+```bash
+sudo -u scamguard /opt/scamguard/.venv/bin/pip install -r requirements-web.txt
+```
+
+## 2. Tell BotFather the domain
+
+The Telegram login widget refuses to load on a domain the bot does not claim:
+
+```
+/setdomain  ->  your bot  ->  panel.example.com
+```
+
+## 3. Configure
+
+In `.env`:
+
+```
+WEB_ADMIN_IDS=1395418600          # comma-separated Telegram user ids
+WEB_BOT_USERNAME=you_are_safebot  # no @
+WEB_BASE_URL=https://panel.example.com
+WEB_SESSION_SECRET=               # empty derives one from the bot token
+```
+
+**`WEB_ADMIN_IDS` empty denies everyone.** That is deliberate: defaulting to
+open would mean a forgotten value silently publishes every moderation record.
+
+## 4. Service + HTTPS
+
+```bash
+sudo cp deploy/scamguard-web.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now scamguard-web
+```
+
+It binds to `127.0.0.1:8080` only. Put a reverse proxy in front for TLS —
+Caddy does certificates automatically:
+
+```
+# /etc/caddy/Caddyfile
+panel.example.com {
+    reverse_proxy 127.0.0.1:8080
+}
+```
+
+```bash
+sudo apt install caddy && sudo systemctl reload caddy
+```
+
+Do **not** expose port 8080 directly. Without TLS the session cookie and every
+message shown travel in clear text.
+
+## 5. Check it
+
+```bash
+curl -s localhost:8080/healthz          # {"ok":true}
+```
+
+Then open `https://panel.example.com`, sign in with Telegram, and confirm you
+land on the dashboard. Signing in with a non-allow-listed account should be
+refused — worth testing once, because that check is the only thing between the
+internet and your groups' private messages.

@@ -1,0 +1,37 @@
+[Unit]
+Description=ScamGuard dashboard (read-only)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=scamguard
+Group=scamguard
+WorkingDirectory=/opt/scamguard
+# Bound to localhost only. The reverse proxy (Caddy/nginx) terminates TLS and
+# is the sole public entry point — the panel renders private group messages,
+# so it must never be reachable directly over plain HTTP.
+ExecStart=/opt/scamguard/.venv/bin/uvicorn web.app:app --host 127.0.0.1 --port 8080
+
+Restart=always
+RestartSec=10
+
+# Separate from the bot on purpose: the panel can crash or be restarted without
+# interrupting moderation, and it opens the database read-only so a bug here
+# cannot corrupt moderation state.
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=scamguard-web
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+RestrictSUIDSGID=true
+# Read-write because SQLite needs to create the -shm/-wal sidecar files even
+# for readers. The connection itself is opened mode=ro.
+ReadWritePaths=/opt/scamguard
+
+[Install]
+WantedBy=multi-user.target
