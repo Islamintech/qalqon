@@ -30,7 +30,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import settings  # noqa: E402
 from web import queries  # noqa: E402
 from web.auth import (  # noqa: E402
-    is_allowed, issue_session, read_session, session_secret, verify_telegram_login,
+    TOKEN_USER, is_allowed, issue_session, read_session, session_secret,
+    verify_access_token, verify_telegram_login,
 )
 
 log = logging.getLogger("scamguard.web")
@@ -120,8 +121,9 @@ code{background:#171a21;padding:2px 6px;border-radius:4px;font-size:12px}
 def page(body: str, user_id: int | None = None) -> HTMLResponse:
     mode = "LIVE" if not settings.dry_run else "DRY-RUN"
     cls = "live" if not settings.dry_run else "dry"
+    label = "token" if user_id == TOKEN_USER else user_id
     who = (
-        f'<span class="muted">signed in as {user_id} · '
+        f'<span class="muted">signed in as {e(label)} · '
         f'<a href="/logout">sign out</a></span>'
         if user_id else ""
     )
@@ -140,24 +142,57 @@ def page(body: str, user_id: int | None = None) -> HTMLResponse:
 async def login(request: Request):
     if _current_user(request):
         return RedirectResponse("/", status_code=303)
-    if not settings.web_bot_username:
-        return page(
-            "<main class=login><h2>Setup needed</h2><p class=muted>Set "
-            "<code>WEB_BOT_USERNAME</code> to your bot's username, and run "
-            "<code>/setdomain</code> in @BotFather pointing at this site — the "
-            "Telegram login widget refuses to load otherwise.</p></main>"
+    blocks = []
+    if settings.web_bot_username:
+        blocks.append(
+            '<script async src="https://telegram.org/js/telegram-widget.js?22" '
+            f'data-telegram-login="{e(settings.web_bot_username)}" data-size="large" '
+            f'data-auth-url="{e(settings.web_base_url)}/auth/telegram" '
+            'data-request-access="write"></script>'
         )
-    widget = (
-        '<script async src="https://telegram.org/js/telegram-widget.js?22" '
-        f'data-telegram-login="{e(settings.web_bot_username)}" data-size="large" '
-        f'data-auth-url="{e(settings.web_base_url)}/auth/telegram" '
-        'data-request-access="write"></script>'
-    )
+    if settings.web_access_token:
+        blocks.append(
+            '<form method="post" action="/auth/token" style="margin-top:18px">'
+            '<input type="password" name="token" placeholder="access token" '
+            'autocomplete="current-password" style="width:100%;padding:10px;'
+            'border-radius:8px;border:1px solid #232734;background:#171a21;'
+            'color:#e6e8ee;font-size:14px">'
+            '<button type="submit" style="margin-top:10px;width:100%;padding:10px;'
+            'border-radius:8px;border:0;background:#2f4f8f;color:#fff;'
+            'font-size:14px;font-weight:600;cursor:pointer">Sign in</button></form>'
+        )
+    if not blocks:
+        return page(
+            "<main class=login><h2>Setup needed</h2><p class=muted>No sign-in "
+            "method is configured. Either set <code>WEB_BOT_USERNAME</code> and "
+            "register the domain with <code>/setdomain</code> in @BotFather, or "
+            "set <code>WEB_ACCESS_TOKEN</code> (32+ characters) to sign in with "
+            "a token instead.</p></main>"
+        )
     return page(
         f"<main class=login><h2>Sign in</h2>"
-        f"<p class=muted>Only allow-listed Telegram admins can view this.</p>"
-        f"{widget}</main>"
+        f"<p class=muted>Only allow-listed admins can view this.</p>"
+        f"{''.join(blocks)}</main>"
     )
+
+
+@app.post("/auth/token")
+async def auth_token(request: Request):
+    form = await request.form()
+    if not verify_access_token(form.get("token", ""), settings.web_access_token):
+        log.warning("dashboard token sign-in REJECTED from %s", request.client.host)
+        return page("<main class=login><h2>Sign-in failed</h2>"
+                    "<p class=muted>That token is not valid. "
+                    "<a href='/login'>Try again</a>.</p></main>")
+    response = RedirectResponse("/", status_code=303)
+    response.set_cookie(
+        COOKIE, issue_session(TOKEN_USER, SECRET),
+        httponly=True, samesite="lax",
+        secure=settings.web_base_url.startswith("https"),
+        max_age=604800,
+    )
+    log.info("dashboard token sign-in from %s", request.client.host)
+    return response
 
 
 @app.get("/auth/telegram")

@@ -11,8 +11,11 @@ ENV PYTHONUNBUFFERED=1 \
 WORKDIR /app
 
 # Requirements first so a code change does not invalidate the dependency layer.
-COPY requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
+# One image serves both the bot and the dashboard. requirements-web includes
+# requirements, so this is the bot's dependencies plus a few MB — cheaper than
+# building and maintaining two images that must stay in step.
+COPY requirements.txt requirements-web.txt ./
+RUN pip install --no-cache-dir -r requirements-web.txt
 
 COPY . .
 

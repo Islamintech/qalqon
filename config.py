@@ -105,6 +105,10 @@ class Settings:
     # Leave empty to derive one from the bot token (rotating the token then
     # invalidates every session).
     web_session_secret: str = os.getenv("WEB_SESSION_SECRET", "")
+    # Alternative sign-in for reaching the panel without a domain (Telegram's
+    # widget requires one). Empty disables it — a default-on second credential
+    # is how panels end up unintentionally reachable. Must be 32+ chars.
+    web_access_token: str = os.getenv("WEB_ACCESS_TOKEN", "")
 
     # Safety switch. When True the bot only REPORTS what it would do and never
     # actually deletes or bans. Keep this on until you trust the detection.

@@ -147,3 +147,46 @@ def test_the_derived_secret_is_stable_and_token_bound():
     assert a == session_secret("", TOKEN), "must survive a restart"
     assert a != session_secret("", "999:other"), "rotating the token logs everyone out"
     assert session_secret("explicit", TOKEN) == "explicit"
+
+
+# --- token sign-in (used when there is no domain for Telegram login) --------
+from web.auth import TOKEN_USER, verify_access_token  # noqa: E402
+
+GOOD = "x" * 48
+
+
+def test_the_right_token_is_accepted():
+    assert verify_access_token(GOOD, GOOD) is True
+
+
+def test_a_wrong_token_is_rejected():
+    assert verify_access_token("y" * 48, GOOD) is False
+
+
+def test_a_prefix_of_the_token_is_rejected():
+    """Constant-time comparison, so a partial match reveals nothing."""
+    assert verify_access_token(GOOD[:40], GOOD) is False
+
+
+def test_token_login_is_off_unless_configured():
+    """A default-on second credential is how panels end up reachable."""
+    assert verify_access_token("anything", "") is False
+    assert verify_access_token("", "") is False
+
+
+def test_a_short_token_is_refused_even_if_it_matches():
+    """The whole security argument rests on entropy, so a memorable password
+    must not be usable here."""
+    assert verify_access_token("hunter2", "hunter2") is False
+    assert verify_access_token("a" * 31, "a" * 31) is False
+    assert verify_access_token("a" * 32, "a" * 32) is True
+
+
+@pytest.mark.parametrize("supplied", ["", None, 0, [], {}])
+def test_empty_supplied_values_never_pass(supplied):
+    assert verify_access_token(supplied, GOOD) is False
+
+
+def test_the_token_user_id_cannot_collide_with_a_real_one():
+    """Telegram ids are positive, so a negative sentinel is unambiguous."""
+    assert TOKEN_USER < 0

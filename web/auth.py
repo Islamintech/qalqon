@@ -126,3 +126,34 @@ def session_secret(configured: str, bot_token: str) -> str:
     if configured:
         return configured
     return hashlib.sha256(f"scamguard-web-session:{bot_token}".encode()).hexdigest()
+
+
+def verify_access_token(supplied: str, configured: str) -> bool:
+    """Token sign-in, for reaching the panel without a domain.
+
+    Telegram's login widget validates the page's domain against the one
+    registered with /setdomain, so it cannot work over an SSH tunnel or a bare
+    IP. This is the alternative — and being a second way in, it is deliberately
+    narrow:
+
+      - OPT-IN. Disabled unless WEB_ACCESS_TOKEN is set. A default-on secondary
+        credential is how panels end up unintentionally reachable.
+      - Long. Rejects anything under 32 characters, so a memorable password
+        cannot be used where the whole security argument rests on entropy.
+      - Constant-time. A plain == leaks the matching prefix length, which is
+        enough to recover a token one character at a time.
+
+    Intended to be paired with binding the panel to 127.0.0.1, so that using it
+    already requires SSH access to the host.
+    """
+    if not configured or len(configured) < 32:
+        return False
+    if not supplied:
+        return False
+    return hmac.compare_digest(str(supplied), str(configured))
+
+
+# Sentinel user id recorded for a token sign-in. Negative so it can never
+# collide with a real Telegram user id, and distinguishable in the logs from
+# someone who signed in as a known person.
+TOKEN_USER = -1

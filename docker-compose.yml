@@ -30,3 +30,31 @@ services:
         # log from a chatty bot must never be what fills the disk.
         max-size: "10m"
         max-file: "3"
+
+  # Read-only dashboard. Optional: `docker compose up -d web` to start it.
+  web:
+    build: .
+    image: scamguard:latest
+    container_name: scamguard-web
+    restart: unless-stopped
+    user: "${PUID:-1000}:${PGID:-1000}"
+    env_file: .env
+    environment:
+      DB_PATH: /data/scamguard.db
+    volumes:
+      # Read-only mount as well as a read-only SQLite connection. Two
+      # independent guarantees that the panel cannot alter moderation state.
+      - ./data:/data:ro
+    # 127.0.0.1 ONLY. Reached over an SSH tunnel:
+    #   ssh -L 8080:127.0.0.1:8080 <user>@<host>
+    # Binding to 0.0.0.0 would publish private group messages over plain HTTP.
+    ports:
+      - "127.0.0.1:8080:8080"
+    command: >
+      uvicorn web.app:app --host 0.0.0.0 --port 8080
+      --proxy-headers --forwarded-allow-ips=*
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
