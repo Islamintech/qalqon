@@ -12,7 +12,7 @@ from models import (
     ChannelAnalyzer, MTProtoScanner, Policy, Store, LinkAnalyzer,
     BurstDetector, AdminCache, Autonomy,
 )
-from views import TelegramView, AlertBatcher, DigestReporter
+from views import TelegramView, AlertBatcher, DigestReporter, Heartbeat
 from controllers import ModerationController, AdminController
 
 logging.basicConfig(
@@ -115,6 +115,7 @@ def main() -> None:
     )
 
     digest = DigestReporter(interval=settings.digest_interval)
+    heartbeat = Heartbeat(store, interval=settings.heartbeat_interval)
     autonomy = Autonomy.parse(settings.autonomy)
 
     controller = ModerationController(
@@ -162,6 +163,17 @@ def main() -> None:
 
         await digest.start(_send_digest)
 
+        if settings.heartbeat_interval:
+            await heartbeat.startup(
+                _send_digest,
+                detail=(
+                    f"mode: {'DRY-RUN' if settings.dry_run else 'LIVE'} | "
+                    f"autonomy: {autonomy.value} | "
+                    f"admins skipped: {'yes' if settings.skip_group_admins else 'no'}"
+                ),
+            )
+            await heartbeat.start(_send_digest)
+
     async def _post_shutdown(app: Application) -> None:
         # Emit any pending digest before going down, so a raid's last alerts
         # are not lost with the process.
@@ -170,6 +182,9 @@ def main() -> None:
             if settings.admin_chat_id:
                 await app.bot.send_message(chat_id=settings.admin_chat_id, text=body)
 
+        await heartbeat.stop()
+        if settings.heartbeat_interval:
+            await heartbeat.shutdown(_send_digest)
         await digest.stop(_send_digest)
         await view.flush_alerts(app.bot)
         await mtproto.stop()

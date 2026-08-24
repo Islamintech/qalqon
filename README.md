@@ -366,6 +366,7 @@ is read-only apart from one test message, and exits non-zero on any blocker.
 
 ```
 AUTONOMY=assisted          # report | assisted | autonomous
+HEARTBEAT_INTERVAL=86400   # seconds between proof-of-life pings (0 disables)
 DIGEST_INTERVAL=21600      # seconds between digest summaries (6h)
 BLOCKED_DOMAINS=           # comma-separated, always red-flagged
 FLOOD_MESSAGES=5           # messages per user...
@@ -574,6 +575,36 @@ early.
 Note this is separate from `AlertBatcher`, which is a pressure valve for when
 *live* alerts arrive faster than a human can read them. The digest is the normal
 path for things nobody needs to see immediately.
+
+## Running it for real
+
+See [deploy/DEPLOY.md](deploy/DEPLOY.md) for VPS setup (systemd unit, hardening,
+database backups, update procedure).
+
+**Proof of life.** A moderation bot that has silently died is worse than no bot:
+the groups look protected, nobody is watching them, and the failure produces no
+alerts *because the thing that would alert is the thing that died*. Quiet means
+both "nothing bad happened" and "I stopped working", and those must be
+distinguishable.
+
+So it says so on a schedule:
+
+- `✅ ScamGuard started` — once per start, so a crash-loop shows up as a stream
+  of these rather than as silence
+- `💚 ScamGuard still running` — every `HEARTBEAT_INTERVAL` (default 24h), with
+  what it has done since the last one. **Sent even when nothing happened** — the
+  absence of this message is the alarm, so it cannot be conditional on there
+  being something to report. (Contrast the digest, which stays silent on a quiet
+  period: a digest reports on events, the heartbeat reports on the process.)
+- `⏹ ScamGuard stopping` — clean shutdown only, so an expected stop is
+  distinguishable from a crash
+
+A failing heartbeat send never propagates: the bot must not die because a
+notification failed.
+
+**Verify the supervision, do not assume it.** Supervision that silently fails
+looks exactly like supervision that works, and you find out during an incident.
+`DEPLOY.md` has the kill-it-and-reboot-it checklist.
 
 ### Still worth doing
 

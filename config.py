@@ -86,6 +86,10 @@ class Settings:
     # Seconds between digest summaries of routine, already-handled actions.
     digest_interval: float = float(os.getenv("DIGEST_INTERVAL", "21600"))
 
+    # Proof of life. The signal you act on is the ABSENCE of the daily ping,
+    # so it is sent on a schedule regardless of activity. 0 disables it.
+    heartbeat_interval: float = float(os.getenv("HEARTBEAT_INTERVAL", "86400"))
+
     # Safety switch. When True the bot only REPORTS what it would do and never
     # actually deletes or bans. Keep this on until you trust the detection.
     dry_run: bool = os.getenv("DRY_RUN", "true").lower() == "true"
