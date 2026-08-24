@@ -271,7 +271,7 @@ class Store:
             ).fetchone()[0]
             return {
                 "bot_actions": acted,
-                "human_reviewed": reviewed,
+                "reviewed": reviewed,
                 "overturned": overturned,
                 "confirmed": confirmed,
                 "overturn_rate": (overturned / reviewed) if reviewed else None,
