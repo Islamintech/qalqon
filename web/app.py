@@ -34,6 +34,15 @@ from web.auth import (  # noqa: E402
     verify_access_token, verify_telegram_login,
 )
 
+# uvicorn configures its own loggers but not ours, so without this every
+# INFO record from the app is dropped — including successful sign-ins. On a
+# panel that renders private group messages, "who looked, and when" is the one
+# audit trail worth having, and silence is indistinguishable from nobody
+# looking.
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(name)s %(levelname)s %(message)s",
+)
 log = logging.getLogger("scamguard.web")
 app = FastAPI(title="ScamGuard", docs_url=None, redoc_url=None, openapi_url=None)
 
