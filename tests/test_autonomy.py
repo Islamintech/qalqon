@@ -8,6 +8,7 @@ import pytest
 
 from conftest import FakeContext, FakeLLM, FakeMessage, FakeProfiles, FakeUpdate
 from models import Action, Autonomy, Risk
+from test_controller import build
 from views import DigestReporter
 
 
@@ -132,20 +133,11 @@ async def test_stop_emits_the_partial_period():
 
 # --- through the controller ------------------------------------------------
 def build_with(store, autonomy, digest, llm_risk=Risk.RED_FLAG,
-               profile_risk=Risk.RED_FLAG):
-    from controllers import ModerationController
-    from models import FileScanner, KeywordFilter, LinkAnalyzer, Policy
-    from views import AlertBatcher, TelegramView
-
-    view = TelegramView(False, "999", batcher=AlertBatcher(threshold=10_000))
-    return ModerationController(
-        keyword_filter=KeywordFilter(),
-        llm_client=FakeLLM(llm_risk),
-        profile_analyzer=FakeProfiles(profile_risk),
-        view=view, store=store, policy=Policy(), file_scanner=FileScanner(),
-        link_analyzer=LinkAnalyzer(), digest=digest, autonomy=autonomy,
-        skip_group_admins=False,
-    )
+               profile_risk=Risk.RED_FLAG, bot=None):
+    return build(
+        store, FakeLLM(llm_risk), FakeProfiles(profile_risk),
+        digest=digest, autonomy=autonomy, bot=bot,
+    )[0]
 
 
 async def send(controller, bot, text="guaranteed 300% returns, dm me now"):
@@ -156,7 +148,7 @@ async def send(controller, bot, text="guaranteed 300% returns, dm me now"):
 
 async def test_assisted_alerts_live_on_a_ban(store, bot):
     d = DigestReporter()
-    await send(build_with(store, Autonomy.ASSISTED, d), bot)
+    await send(build_with(store, Autonomy.ASSISTED, d, bot=bot), bot)
     assert bot.sent, "a ban must be seen quickly enough to undo"
     assert d.pending == 0
 
@@ -164,7 +156,7 @@ async def test_assisted_alerts_live_on_a_ban(store, bot):
 async def test_assisted_digests_a_delete(store, bot):
     """Message gone, user stays — nobody needs a 3am ping for that."""
     d = DigestReporter()
-    controller = build_with(store, Autonomy.ASSISTED, d, profile_risk=Risk.CLEAN)
+    controller = build_with(store, Autonomy.ASSISTED, d, profile_risk=Risk.CLEAN, bot=bot)
     await send(controller, bot)
     assert bot.sent == [], "a routine delete should not interrupt anyone"
     assert d.pending == 1
@@ -172,20 +164,20 @@ async def test_assisted_digests_a_delete(store, bot):
 
 async def test_autonomous_never_interrupts(store, bot):
     d = DigestReporter()
-    await send(build_with(store, Autonomy.AUTONOMOUS, d), bot)
+    await send(build_with(store, Autonomy.AUTONOMOUS, d, bot=bot), bot)
     assert bot.sent == []
     assert d.pending == 1
 
 
 async def test_report_mode_acts_on_nothing(store, bot):
     d = DigestReporter()
-    await send(build_with(store, Autonomy.REPORT, d), bot)
+    await send(build_with(store, Autonomy.REPORT, d, bot=bot), bot)
     assert bot.banned == [] and bot.deleted == [], "report mode must not act"
     assert bot.sent, "but it must still report"
 
 
 async def test_without_a_digest_everything_still_alerts(store, bot):
     """Backwards compatible: no digest configured means no silent drops."""
-    controller = build_with(store, Autonomy.ASSISTED, None, profile_risk=Risk.CLEAN)
+    controller = build_with(store, Autonomy.ASSISTED, None, profile_risk=Risk.CLEAN, bot=bot)
     await send(controller, bot)
     assert bot.sent, "with nowhere to digest to, it must alert instead"

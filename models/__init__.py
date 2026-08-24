@@ -11,10 +11,19 @@ from .link_analyzer import LinkAnalyzer, extract_links
 from .burst_detector import BurstDetector
 from .admin_cache import AdminCache
 from .autonomy import Autonomy
+from .events import (
+    CaseResolved, DetectorDegraded, Event, MemberJoined, MessageJudged,
+    Observable, RaidDetected,
+)
+from .moderation_model import (
+    Attachment, IncomingMessage, JoiningMember, ModerationModel,
+)
 from .mtproto_scanner import MTProtoScanner
 
 __all__ = [
     "Verdict", "Risk", "Action", "Policy", "Decision", "file_decision",
     "Store", "UserRecord", "KeywordFilter", "LLMClient", "ProfileAnalyzer",
-    "VisionClient", "FileScanner", "ChannelAnalyzer", "MTProtoScanner", "LinkAnalyzer", "extract_links", "BurstDetector", "AdminCache", "Autonomy",
+    "VisionClient", "FileScanner", "ChannelAnalyzer", "MTProtoScanner", "LinkAnalyzer", "extract_links", "BurstDetector", "AdminCache", "Autonomy", "ModerationModel", "IncomingMessage",
+    "JoiningMember", "Attachment", "Observable", "Event", "MessageJudged",
+    "MemberJoined", "RaidDetected", "DetectorDegraded", "CaseResolved",
 ]

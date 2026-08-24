@@ -152,7 +152,7 @@ async def test_flush_with_nothing_pending_sends_nothing():
 
 # --- through the controller ------------------------------------------------
 async def test_flooding_escalates_a_new_account(store, bot):
-    controller, _ = build(store, FakeLLM(Risk.CLEAN), FakeProfiles(Risk.RED_FLAG))
+    controller, _ = build(store, FakeLLM(Risk.CLEAN), FakeProfiles(Risk.RED_FLAG), bot=bot)
     for i in range(12):
         msg = FakeMessage(text=f"buy now message {i}", message_id=i)
         await controller.handle_message(FakeUpdate(msg), FakeContext(bot))
@@ -162,7 +162,8 @@ async def test_flooding_escalates_a_new_account(store, bot):
 async def test_an_established_member_may_post_quickly(store, bot):
     """A regular in a heated argument is not a spammer."""
     controller, _ = build(
-        store, FakeLLM(Risk.CLEAN), FakeProfiles(Risk.RED_FLAG), trust_after=3
+        store, FakeLLM(Risk.CLEAN), FakeProfiles(Risk.RED_FLAG),
+        trust_after=3, bot=bot,
     )
     for _ in range(10):
         await store.touch(-1001, 100, "regular")
@@ -173,7 +174,7 @@ async def test_an_established_member_may_post_quickly(store, bot):
 
 
 async def test_a_raid_is_announced_to_admins(store, bot):
-    controller, _ = build(store, FakeLLM(Risk.CLEAN), FakeProfiles())
+    controller, _ = build(store, FakeLLM(Risk.CLEAN), FakeProfiles(), bot=bot)
     for uid in range(200, 210):
         msg = FakeMessage(text="hello everyone here", user=FakeUser(uid, f"u{uid}"))
         await controller.handle_message(FakeUpdate(msg), FakeContext(bot))
@@ -183,7 +184,7 @@ async def test_a_raid_is_announced_to_admins(store, bot):
 
 async def test_pace_alone_never_bans(store, bot):
     """Pace feeds the normal escalation path; it is not its own punishment."""
-    controller, _ = build(store, FakeLLM(Risk.CLEAN), FakeProfiles(Risk.CLEAN))
+    controller, _ = build(store, FakeLLM(Risk.CLEAN), FakeProfiles(Risk.CLEAN), bot=bot)
     for i in range(15):
         msg = FakeMessage(text=f"ordinary chatter {i}", message_id=i)
         await controller.handle_message(FakeUpdate(msg), FakeContext(bot))

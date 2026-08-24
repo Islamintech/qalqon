@@ -135,12 +135,17 @@ class FakeLLM:
 
 
 class FakeProfiles:
+    """The profile port as the Model sees it: no Telegram object anywhere."""
+
     def __init__(self, risk=Risk.CLEAN, reason="fake profile"):
         self.risk = risk
         self.reason = reason
         self.calls = 0
 
-    async def analyze(self, bot, user_id):
+    def attach(self, bot):
+        pass
+
+    async def analyze(self, user_id):
         self.calls += 1
         return Verdict(self.risk, self.reason, "profile")
 

@@ -26,8 +26,16 @@ class ProfileAnalyzer:
     ) -> None:
         self._vision = vision
         self._channel = channel or ChannelAnalyzer()
+        self._bot: Bot | None = None
 
-    async def analyze(self, bot: Bot, user_id: int) -> Verdict:
+    def attach(self, bot: Bot) -> None:
+        """Handed the Bot once at startup. Keeping it here rather than as a
+        parameter is what lets the Model ask for a profile without ever
+        holding a Telegram object itself."""
+        self._bot = bot
+        self._channel.attach(bot)
+
+    async def analyze(self, user_id: int) -> Verdict:
         """Every sub-check ALWAYS contributes a verdict, even a clean one, and
         each names its own source ("bio" / "photo" / "channel") rather than all
         calling themselves "profile".
@@ -37,6 +45,7 @@ class ProfileAnalyzer:
         Appending only on a hit made a clean bio and a skipped bio look
         identical to whoever is reviewing the case.
         """
+        bot = self._bot
         verdicts: list[Verdict] = []
 
         # --- bio -------------------------------------------------------------
@@ -78,6 +87,6 @@ class ProfileAnalyzer:
             )
 
         # --- linked channel --------------------------------------------------
-        verdicts.append(await self._channel.analyze(bot, user_id))
+        verdicts.append(await self._channel.analyze(user_id))
 
         return Verdict.worst(*verdicts)

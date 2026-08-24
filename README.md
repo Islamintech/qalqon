@@ -1,6 +1,39 @@
-# ScamGuard — Telegram anti-scam moderation bot (Phase 1)
+# ScamGuard — Telegram anti-scam moderation bot
 
-Python + Groq (free LLM) + keyword matching, in an MVC layout.
+Python + Groq + keyword/link/file detection, in a Model–View–Controller layout.
+
+## The architecture
+
+Event-driven MVC. The Controller never calls a View, and the Model never knows
+a View exists:
+
+```
+    Telegram update
+          |
+    CONTROLLER   translates the update into a domain call. Decides nothing,
+          |      renders nothing. All Telegram-shaped knowledge stops here.
+          v
+      MODEL      every rule and all state. Gathers evidence, asks Policy for a
+          |      decision, applies it, records it — then ANNOUNCES what
+          |      happened as a domain event.
+          v  (notifies)
+      VIEWS      subscribe and react. TelegramView deletes/bans/alerts;
+                 DigestReporter batches; add another and nothing else changes.
+```
+
+The property that makes it real rather than three folders with MVC names:
+**`models/` has no Telegram import.** The Model is handed plain dataclasses
+(`IncomingMessage`, `JoiningMember`) and hands back events, so it can be driven
+by a test, a CLI, or a different chat platform without a line changing.
+
+Inside the Model, the escalation rules are pure: `Policy.decide()` is a
+function of `(content, profile, strikes, trusted)` with no I/O and no clock.
+It is the code that decides whether a real person gets banned, so it is kept
+where it can be tested exhaustively — see `tests/test_policy.py`.
+
+Events describe what HAPPENED, never what to do about it. The moment an event
+says "send an alert", the Model is issuing orders to a View again and the
+separation is gone.
 
 ## Structure
 

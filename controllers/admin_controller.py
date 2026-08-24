@@ -16,9 +16,7 @@ from models.store import (
     Store, STATUS_BANNED, STATUS_NORMAL, STATUS_WHITELISTED,
 )
 from views import TelegramView
-from views.telegram_view import (
-    parse_callback, VERB_BAN, VERB_UNBAN, VERB_IGNORE, VERB_WHITELIST,
-)
+from views.telegram_view import parse_callback, VERB_BAN, VERB_UNBAN
 
 log = logging.getLogger("scamguard.admin")
 
@@ -41,12 +39,13 @@ From the admin chat, pass the chat first: /status <chat_id> <user_id>"""
 class AdminController:
     def __init__(
         self, store: Store, view: TelegramView, admin_chat_id: str = "",
-        digest=None,
+        digest=None, model=None,
     ) -> None:
         self._store = store
         self._view = view
         self._admin_chat_id = str(admin_chat_id or "")
         self._digest = digest
+        self._model = model
 
     # --- authorization ---------------------------------------------------
     async def _is_admin(self, update: Update, context, chat_id: int | None = None) -> bool:
@@ -171,7 +170,8 @@ class AdminController:
         chat_id, user_id = target
         if not await self._is_admin(update, context, chat_id):
             return
-        ok = await self._view.unban_user(context.bot, chat_id, user_id)
+        self._view.attach(context.bot)
+        ok = await self._view.unban_user(chat_id, user_id)
         await self._store.set_status(chat_id, user_id, STATUS_NORMAL)
         await self._store.clear_strikes(chat_id, user_id)
         await update.effective_message.reply_text(
@@ -242,37 +242,22 @@ class AdminController:
             await query.answer("not authorized", show_alert=True)
             return
 
-        bot = context.bot
-        # `overturned` records whether a human judged the bot WRONG. This is
-        # ground truth — the only unbiased signal of the false-positive rate,
-        # and it exists nowhere else. Everything else in the events table is the
-        # bot grading its own homework.
-        if verb == VERB_BAN:
-            await self._view.kick_user(bot, chat_id, user_id)
-            await self._store.set_status(chat_id, user_id, STATUS_BANNED)
-            note, event, overturned = "banned 🚫", "ADMIN_BAN", False
-        elif verb == VERB_UNBAN:
-            await self._view.unban_user(bot, chat_id, user_id)
-            await self._store.set_status(chat_id, user_id, STATUS_NORMAL)
-            await self._store.clear_strikes(chat_id, user_id)
-            note, event, overturned = "unbanned ♻️", "ADMIN_UNBAN", True
-        elif verb == VERB_IGNORE:
-            # A false positive shouldn't leave a strike behind to escalate on.
-            await self._store.clear_strikes(chat_id, user_id)
-            note, event, overturned = "ignored — strikes cleared 👌", "ADMIN_IGNORE", True
-        elif verb == VERB_WHITELIST:
-            await self._store.set_status(chat_id, user_id, STATUS_WHITELISTED)
-            note, event, overturned = "whitelisted ✅", "ADMIN_WHITELIST", True
-        else:
+        # The Model owns the state change and the record of whether a human
+        # overturned us; this only reports the outcome back to the tapper.
+        by = update.effective_user
+        self._view.attach(context.bot)
+        note = await self._model.resolve(
+            chat_id, user_id, verb,
+            by_user_id=by.id, by_username=by.username or "",
+        )
+        if note is None:
             await query.answer("unknown action")
             return
+        if verb == VERB_BAN:
+            await self._view.kick_user(chat_id, user_id)
+        elif verb == VERB_UNBAN:
+            await self._view.unban_user(chat_id, user_id)
 
-        by = update.effective_user
-        await self._store.log_event(
-            chat_id, user_id, event,
-            "OVERTURNED" if overturned else "CONFIRMED",
-            f"by admin {by.id} (@{by.username or '?'})",
-        )
         await query.answer(note)
         try:
             # Stamp the outcome onto the alert and drop the buttons, so the same

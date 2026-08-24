@@ -22,10 +22,14 @@ SUSPICIOUS_DESC_TERMS = [
 class ChannelAnalyzer:
     def __init__(self, mtproto=None) -> None:
         self._mtproto = mtproto
+        self._bot: Bot | None = None
 
-    async def analyze(self, bot: Bot, user_id: int) -> Verdict:
+    def attach(self, bot: Bot) -> None:
+        self._bot = bot
+
+    async def analyze(self, user_id: int) -> Verdict:
         try:
-            chat = await bot.get_chat(user_id)
+            chat = await self._bot.get_chat(user_id)
             personal = getattr(chat, "personal_chat", None)
             if not personal:
                 return Verdict(Risk.CLEAN, "no linked channel", "channel")

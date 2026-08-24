@@ -132,14 +132,17 @@ def test_degradation_is_sticky_through_worst():
 
 
 class DegradedProfiles:
-    async def analyze(self, bot, user_id):
+    def attach(self, bot):
+        pass
+
+    async def analyze(self, user_id):
         return Verdict(
             Risk.CLEAN, "vision unavailable: DNS", "profile", degraded=True
         )
 
 
 async def test_broken_photo_screening_reaches_the_admins(store, bot):
-    controller, _ = build(store, FakeLLM(Risk.RED_FLAG), DegradedProfiles())
+    controller, _ = build(store, FakeLLM(Risk.RED_FLAG), DegradedProfiles(), bot=bot)
     msg = FakeMessage(text="guaranteed profit, dm me to invest today")
     await controller.handle_message(FakeUpdate(msg), FakeContext(bot))
     warnings = [t for _, t, _ in bot.sent if "DEGRADED" in t]
@@ -153,7 +156,7 @@ async def test_llm_and_vision_outages_are_reported_separately(store, bot):
         async def analyze(self, text, context=""):
             return Verdict(Risk.CLEAN, "llm unavailable: 429", "llm", degraded=True)
 
-    controller, _ = build(store, DeadLLM(), DegradedProfiles())
+    controller, _ = build(store, DeadLLM(), DegradedProfiles(), bot=bot)
     msg = FakeMessage(text="check out my profile for guaranteed profits")
     await controller.handle_message(FakeUpdate(msg), FakeContext(bot))
     warned = " ".join(t for _, t, _ in bot.sent if "DEGRADED" in t)
@@ -180,7 +183,10 @@ class _ProfileBot:
 
 
 class _NoChannel:
-    async def analyze(self, bot, user_id):
+    def attach(self, bot):
+        pass
+
+    async def analyze(self, user_id):
         from models import Verdict, Risk
         return Verdict(Risk.CLEAN, "no linked channel", "channel")
 
@@ -190,9 +196,9 @@ async def test_every_profile_subcheck_appears_even_when_clean():
     clean bio from a bio that was never checked."""
     from models import ProfileAnalyzer
 
-    v = await ProfileAnalyzer(vision=None, channel=_NoChannel()).analyze(
-        _ProfileBot(bio="just a normal person", photos=1), 42
-    )
+    analyzer = ProfileAnalyzer(vision=None, channel=_NoChannel())
+    analyzer.attach(_ProfileBot(bio="just a normal person", photos=1))
+    v = await analyzer.analyze(42)
     sources = [c.source for c in v.components]
     assert "bio" in sources and "photo" in sources and "channel" in sources
     assert v.risk is Risk.CLEAN
@@ -201,9 +207,9 @@ async def test_every_profile_subcheck_appears_even_when_clean():
 async def test_a_missing_photo_is_still_flagged():
     from models import ProfileAnalyzer
 
-    v = await ProfileAnalyzer(vision=None, channel=_NoChannel()).analyze(
-        _ProfileBot(bio="", photos=0), 42
-    )
+    analyzer = ProfileAnalyzer(vision=None, channel=_NoChannel())
+    analyzer.attach(_ProfileBot(bio="", photos=0))
+    v = await analyzer.analyze(42)
     assert v.risk is Risk.FIFTY_FIFTY
     assert "no profile photo" in v.breakdown()
 
@@ -211,9 +217,11 @@ async def test_a_missing_photo_is_still_flagged():
 async def test_a_scam_bio_is_caught_and_named():
     from models import ProfileAnalyzer
 
-    v = await ProfileAnalyzer(vision=None, channel=_NoChannel()).analyze(
-        _ProfileBot(bio="crypto signals, guaranteed profit, dm for details", photos=1), 42
+    analyzer = ProfileAnalyzer(vision=None, channel=_NoChannel())
+    analyzer.attach(
+        _ProfileBot(bio="crypto signals, guaranteed profit, dm for details", photos=1)
     )
+    v = await analyzer.analyze(42)
     assert v.risk is Risk.RED_FLAG
     assert "bio" in v.breakdown()
 
@@ -222,7 +230,7 @@ async def test_screening_switched_off_is_distinguishable_from_a_clean_photo():
     """'screening off' and 'photo ok' must not look the same in an alert."""
     from models import ProfileAnalyzer
 
-    v = await ProfileAnalyzer(vision=None, channel=_NoChannel()).analyze(
-        _ProfileBot(bio="hi", photos=1), 42
-    )
+    analyzer = ProfileAnalyzer(vision=None, channel=_NoChannel())
+    analyzer.attach(_ProfileBot(bio="hi", photos=1))
+    v = await analyzer.analyze(42)
     assert "screening off" in v.breakdown()

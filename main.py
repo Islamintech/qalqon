@@ -10,7 +10,7 @@ from config import settings
 from models import (
     KeywordFilter, LLMClient, ProfileAnalyzer, VisionClient, FileScanner,
     ChannelAnalyzer, MTProtoScanner, Policy, Store, LinkAnalyzer,
-    BurstDetector, AdminCache, Autonomy,
+    BurstDetector, AdminCache, Autonomy, ModerationModel,
 )
 from views import TelegramView, AlertBatcher, DigestReporter, Heartbeat
 from controllers import ModerationController, AdminController
@@ -105,6 +105,10 @@ def main() -> None:
         vision=vision,
         channel=ChannelAnalyzer(mtproto=mtproto),
     )
+    digest = DigestReporter(interval=settings.digest_interval)
+    heartbeat = Heartbeat(store, interval=settings.heartbeat_interval)
+    autonomy = Autonomy.parse(settings.autonomy)
+
     view = TelegramView(
         settings.dry_run,
         settings.admin_chat_id,
@@ -112,42 +116,56 @@ def main() -> None:
             threshold=settings.alert_burst_threshold,
             flush_interval=settings.alert_digest_interval,
         ),
+        digest=digest,
+        autonomy=autonomy,
     )
 
-    digest = DigestReporter(interval=settings.digest_interval)
-    heartbeat = Heartbeat(store, interval=settings.heartbeat_interval)
-    autonomy = Autonomy.parse(settings.autonomy)
-
-    controller = ModerationController(
+    # --- MODEL: every rule and all state. Knows nothing about Telegram. ---
+    model = ModerationModel(
+        store=store,
+        policy=Policy(
+            require_profile_confirmation=settings.require_profile_confirmation,
+            strikes_to_escalate=settings.strikes_to_escalate,
+        ),
         keyword_filter=KeywordFilter(),
         llm_client=LLMClient(
             settings.groq_api_key, settings.groq_model,
             cache_ttl=settings.llm_cache_ttl,
         ),
         profile_analyzer=profile_analyzer,
-        view=view,
-        store=store,
-        policy=Policy(
-            require_profile_confirmation=settings.require_profile_confirmation,
-            strikes_to_escalate=settings.strikes_to_escalate,
-        ),
-        file_scanner=file_scanner,
         link_analyzer=LinkAnalyzer(blocklist=settings.blocked_domains),
         burst_detector=BurstDetector(
             flood_messages=settings.flood_messages,
             flood_window=settings.flood_window,
             raid_users=settings.raid_users,
         ),
-        admin_cache=AdminCache(ttl=settings.admin_cache_ttl),
-        skip_group_admins=settings.skip_group_admins,
-        digest=digest,
+        file_scanner=file_scanner,
         autonomy=autonomy,
         trust_after_messages=settings.trust_after_messages,
     )
-    admin = AdminController(store, view, settings.admin_chat_id, digest=digest)
+
+    # --- VIEW: subscribes to the model. The model never calls it, and the
+    # controller never calls it either — that is what makes this MVC rather
+    # than three folders with MVC names.
+    view.subscribe_to(model)
+
+    # --- CONTROLLER: translates Telegram updates into model calls. Holds no
+    # logic, renders nothing.
+    controller = ModerationController(
+        model,
+        admin_cache=AdminCache(ttl=settings.admin_cache_ttl),
+        skip_group_admins=settings.skip_group_admins,
+    )
+    admin = AdminController(
+        store, view, settings.admin_chat_id, digest=digest, model=model
+    )
 
     # Open/close the DB and the Telethon client inside PTB's own event loop.
     async def _post_init(app: Application) -> None:
+        # Hand the Bot to the adapters once, so nothing downstream has to
+        # thread it through as a parameter.
+        view.attach(app.bot)
+        profile_analyzer.attach(app.bot)
         await store.start()
         # A quiet chat would never hit the opportunistic prune in add_strike.
         pruned = await store.prune_strikes()
@@ -186,7 +204,7 @@ def main() -> None:
         if settings.heartbeat_interval:
             await heartbeat.shutdown(_send_digest)
         await digest.stop(_send_digest)
-        await view.flush_alerts(app.bot)
+        await view.flush_alerts()
         await mtproto.stop()
         await store.stop()
 

@@ -94,8 +94,7 @@ async def test_old_strikes_do_not_escalate_a_new_offence(decaying_store, bot):
     """An offender from last year gets the first-offence response, not a ban."""
     controller, _ = build(
         decaying_store, FakeLLM(Risk.RED_FLAG), FakeProfiles(Risk.CLEAN),
-        strikes_to_escalate=1,
-    )
+        strikes_to_escalate=1, bot=bot)
     await decaying_store.add_strike(-1001, 100, n=5, ts=time.time() - 200 * DAY)
     await send(controller, bot, "a fresh scam pitch to everyone here")
     assert bot.banned == [], "expired strikes must not push a first offence to a ban"
@@ -107,8 +106,7 @@ async def test_recent_strikes_do_escalate(decaying_store, bot):
     above is about decay and not about something else being broken."""
     controller, _ = build(
         decaying_store, FakeLLM(Risk.RED_FLAG), FakeProfiles(Risk.CLEAN),
-        strikes_to_escalate=1,
-    )
+        strikes_to_escalate=1, bot=bot)
     await decaying_store.add_strike(-1001, 100, n=5, ts=time.time() - 2 * DAY)
     await send(controller, bot, "a fresh scam pitch to everyone here")
     assert bot.banned == [(-1001, 100)]
