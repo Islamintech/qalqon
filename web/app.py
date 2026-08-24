@@ -28,7 +28,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from config import settings  # noqa: E402
-from web import queries  # noqa: E402
+from web import queries, render  # noqa: E402
 from web.auth import (  # noqa: E402
     TOKEN_USER, is_allowed, issue_session, read_session, session_secret,
     verify_access_token, verify_telegram_login,
@@ -79,71 +79,24 @@ def e(value) -> str:
     return html.escape(str(value if value is not None else ""), quote=True)
 
 
-CSS = """
-*{box-sizing:border-box}
-body{margin:0;font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
- background:#0f1115;color:#e6e8ee}
-a{color:#7aa2f7}
-header{padding:18px 24px;border-bottom:1px solid #232734;display:flex;
- align-items:center;gap:16px;flex-wrap:wrap}
-h1{font-size:18px;margin:0;font-weight:600}
-.badge{padding:3px 10px;border-radius:999px;font-size:12px;font-weight:600}
-.live{background:#3d1d1d;color:#ff9d9d}
-.dry{background:#16301f;color:#8ee0a8}
-.muted{color:#8b90a0}
-main{padding:24px;max-width:1200px;margin:0 auto}
-section{margin-bottom:34px}
-h2{font-size:14px;text-transform:uppercase;letter-spacing:.08em;color:#8b90a0;
- margin:0 0 12px;font-weight:600}
-.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
-.card{background:#171a21;border:1px solid #232734;border-radius:10px;padding:14px 16px}
-.card .n{font-size:26px;font-weight:650;letter-spacing:-.02em}
-.card .l{font-size:12px;color:#8b90a0;margin-top:2px}
-table{width:100%;border-collapse:collapse;font-size:13px}
-th{text-align:left;color:#8b90a0;font-weight:600;padding:8px 10px;
- border-bottom:1px solid #232734;font-size:12px}
-td{padding:8px 10px;border-bottom:1px solid #1b1f28;vertical-align:top}
-tr:hover td{background:#141821}
-.tag{padding:2px 7px;border-radius:5px;font-size:11px;font-weight:600;
- white-space:nowrap;display:inline-block}
-.BAN{background:#3d1d1d;color:#ff9d9d}
-.DELETE{background:#3a2d17;color:#f3c07b}
-.REVIEW{background:#1d2e3d;color:#8fc6ff}
-.ADMIN_IGNORE,.ADMIN_UNBAN,.ADMIN_WHITELIST{background:#2a2140;color:#c3a6ff}
-.ADMIN_BAN{background:#3d1d1d;color:#ff9d9d}
-.chart{display:flex;align-items:flex-end;gap:3px;height:130px;
- background:#171a21;border:1px solid #232734;border-radius:10px;padding:12px}
-.col{flex:1;display:flex;flex-direction:column;justify-content:flex-end;gap:1px;
- min-width:0}
-.bar{width:100%;border-radius:2px 2px 0 0}
-.bar.BAN{background:#e06c6c}.bar.DELETE{background:#d9a441}.bar.REVIEW{background:#5b9bd5}
-.col span{font-size:9px;color:#6b7080;text-align:center;margin-top:5px;
- overflow:hidden;white-space:nowrap}
-.note{background:#171a21;border-left:3px solid #d9a441;padding:10px 14px;
- border-radius:0 8px 8px 0;font-size:13px;color:#b8bdcc;margin-top:10px}
-.msg{color:#9aa0b0;font-size:12px;max-width:420px;overflow-wrap:anywhere}
-.login{max-width:420px;margin:14vh auto;text-align:center;padding:0 20px}
-code{background:#171a21;padding:2px 6px;border-radius:4px;font-size:12px}
-"""
-
-
 def page(body: str, user_id: int | None = None) -> HTMLResponse:
     mode = "LIVE" if not settings.dry_run else "DRY-RUN"
     cls = "live" if not settings.dry_run else "dry"
     label = "token" if user_id == TOKEN_USER else user_id
     who = (
-        f'<span class="muted">signed in as {e(label)} · '
-        f'<a href="/logout">sign out</a></span>'
+        f'<span class="who">{e(label)} · <a href="/logout">sign out</a></span>'
         if user_id else ""
     )
     return HTMLResponse(
-        f"<!doctype html><html><head><meta charset=utf-8>"
-        f"<meta name=viewport content='width=device-width,initial-scale=1'>"
-        f"<title>ScamGuard</title><style>{CSS}</style></head><body>"
-        f"<header><h1>🛡️ ScamGuard</h1>"
-        f"<span class='badge {cls}'>{mode}</span>"
-        f"<span class='muted'>autonomy: {e(settings.autonomy)}</span>"
-        f"<div style='flex:1'></div>{who}</header>{body}</body></html>"
+        "<!doctype html><html lang=en><head><meta charset=utf-8>"
+        "<meta name=viewport content='width=device-width,initial-scale=1'>"
+        "<meta name=robots content='noindex,nofollow'>"
+        "<title>ScamGuard</title>"
+        f"<style>{render.CSS}</style></head><body>"
+        f'<header><span class="brand">{render.LOGO} ScamGuard</span>'
+        f'<span class="badge {cls}">{mode}</span>'
+        f'<span class="sub">{e(settings.autonomy)}</span>'
+        f'<span class="spacer"></span>{who}</header>{body}</body></html>'
     )
 
 
@@ -162,17 +115,13 @@ async def login(request: Request):
     if settings.web_access_token:
         blocks.append(
             '<form method="post" action="/auth/token" style="margin-top:18px">'
-            '<input type="password" name="token" placeholder="access token" '
-            'autocomplete="current-password" style="width:100%;padding:10px;'
-            'border-radius:8px;border:1px solid #232734;background:#171a21;'
-            'color:#e6e8ee;font-size:14px">'
-            '<button type="submit" style="margin-top:10px;width:100%;padding:10px;'
-            'border-radius:8px;border:0;background:#2f4f8f;color:#fff;'
-            'font-size:14px;font-weight:600;cursor:pointer">Sign in</button></form>'
+            '<input class="field" type="password" name="token" '
+            'placeholder="access token" autocomplete="current-password">'
+            '<button class="btn" type="submit">Sign in</button></form>'
         )
     if not blocks:
         return page(
-            "<main class=login><h2>Setup needed</h2><p class=muted>No sign-in "
+            "<main class=login><h2>Setup needed</h2><p>No sign-in "
             "method is configured. Either set <code>WEB_BOT_USERNAME</code> and "
             "register the domain with <code>/setdomain</code> in @BotFather, or "
             "set <code>WEB_ACCESS_TOKEN</code> (32+ characters) to sign in with "
@@ -180,7 +129,7 @@ async def login(request: Request):
         )
     return page(
         f"<main class=login><h2>Sign in</h2>"
-        f"<p class=muted>Only allow-listed admins can view this.</p>"
+        f"<p>Only allow-listed admins can view this.</p>"
         f"{''.join(blocks)}</main>"
     )
 
@@ -191,7 +140,7 @@ async def auth_token(request: Request):
     if not verify_access_token(form.get("token", ""), settings.web_access_token):
         log.warning("dashboard token sign-in REJECTED from %s", request.client.host)
         return page("<main class=login><h2>Sign-in failed</h2>"
-                    "<p class=muted>That token is not valid. "
+                    "<p>That token is not valid. "
                     "<a href='/login'>Try again</a>.</p></main>")
     response = RedirectResponse("/", status_code=303)
     response.set_cookie(
@@ -210,14 +159,14 @@ async def auth_telegram(request: Request):
     user_id = verify_telegram_login(data, settings.telegram_token)
     if user_id is None:
         return page("<main class=login><h2>Sign-in failed</h2>"
-                    "<p class=muted>That login could not be verified, or it "
+                    "<p>That login could not be verified, or it "
                     "expired. <a href='/login'>Try again</a>.</p></main>")
     if not is_allowed(user_id, ALLOWED):
         # Deliberately says who you are: the usual reason for this is an admin
         # not having added their own id yet, and hiding it just wastes time.
         log.warning("denied dashboard access to telegram user %s", user_id)
         return page(
-            f"<main class=login><h2>Not authorised</h2><p class=muted>Telegram "
+            f"<main class=login><h2>Not authorised</h2><p>Telegram "
             f"user <code>{user_id}</code> is not on the allow-list. Add it to "
             f"<code>WEB_ADMIN_IDS</code> and restart the panel.</p></main>"
         )
@@ -245,31 +194,78 @@ async def dashboard(request: Request):
     if not user_id:
         return RedirectResponse("/login", status_code=303)
 
+    # Filters live in ONE row above everything they scope, and are plain links
+    # so the whole page re-renders against the same slice — no per-card
+    # controls, and no JavaScript.
+    try:
+        days = int(request.query_params.get("days", 14))
+    except ValueError:
+        days = 14
+    days = days if days in (7, 14, 30) else 14
+    raw_chat = request.query_params.get("chat", "")
+    chat_id = int(raw_chat) if raw_chat.lstrip("-").isdigit() else None
+
     try:
         conn = queries.connect(settings.db_path)
     except Exception as exc:
         return page(
-            f"<main><h2>Database unavailable</h2><p class=muted>{e(exc)}</p>"
-            f"<p class=muted>Expected at <code>{e(settings.db_path)}</code>. The "
-            f"panel opens it read-only, so it must already exist — start the bot "
-            f"once first.</p></main>", user_id,
+            f"<main><section><h2>Database unavailable</h2>"
+            f"<div class=card><p>{e(exc)}</p><p class=dim>Expected at "
+            f"<code>{e(settings.db_path)}</code>. The panel opens it read-only, "
+            f"so it must already exist &mdash; start the bot once first.</p>"
+            f"</div></section></main>", user_id,
         )
     try:
-        ov = queries.overview(conn)
-        acc = queries.accuracy(conn)
-        daily = queries.daily_activity(conn)
+        ov = queries.overview(conn, chat_id)
+        acc = queries.accuracy(conn, chat_id)
+        daily = queries.daily_activity(conn, chat_id, days=days)
         chats = queries.per_chat(conn)
-        events = queries.recent_events(conn)
+        events = queries.recent_events(conn, chat_id)
         offenders = queries.top_offenders(conn)
         hp = queries.health(conn)
     finally:
         conn.close()
 
-    cards = "".join(
-        f"<div class=card><div class=n>{v}</div><div class=l>{k}</div></div>"
+    def link(days_v=None, chat_v="keep"):
+        params = {"days": days_v if days_v is not None else days}
+        target = chat_id if chat_v == "keep" else chat_v
+        if target is not None:
+            params["chat"] = target
+        return "/?" + "&".join(f"{k}={v}" for k, v in params.items())
+
+    def chip(label, href, current):
+        return (
+            f'<a class="chip" href="{href}" '
+            f'aria-current="{"true" if current else "false"}">{label}</a>'
+        )
+
+    ranges = "".join(chip(f"{d}d", link(days_v=d), d == days) for d in (7, 14, 30))
+    chat_chips = chip("All", link(chat_v=None), chat_id is None) + "".join(
+        chip(e(str(c["chat_id"])[-6:]), link(chat_v=c["chat_id"]),
+             chat_id == c["chat_id"])
+        for c in chats[:6]
+    )
+    filters = (
+        f'<div class="filters">'
+        f'<div class="fgroup"><span class="flabel">Period</span>{ranges}</div>'
+        f'<div class="fgroup"><span class="flabel">Group</span>{chat_chips}</div>'
+        f'</div>'
+    )
+
+    # --- hero + tiles ------------------------------------------------------
+    period_actions = sum(d["REVIEW"] + d["DELETE"] + d["BAN"] for d in daily)
+    per_day = period_actions / days if days else 0
+    hero = (
+        f'<div class="hero"><span class="v">{period_actions}</span>'
+        f'<span class="k">moderation actions in the last {days} days<br>'
+        f'<span class="dim">{per_day:.1f} per day &middot; last activity '
+        f'{_ago(hp["last_event"])}</span></span></div>'
+    )
+    tiles = "".join(
+        f'<div class="tile"><div class="v">{v}</div><div class="k">{k}</div></div>'
         for k, v in (
-            ("groups", len(chats)),
-            ("known users", ov["users"]),
+            ("groups watched", len(chats)),
+            ("known members", ov["users"]),
             ("messages seen", ov["messages_seen"]),
             ("active strikes", ov["active_strikes"]),
             ("banned", ov["banned"]),
@@ -277,84 +273,136 @@ async def dashboard(request: Request):
         )
     )
 
-    peak = max(
-        (d["REVIEW"] + d["DELETE"] + d["BAN"] for d in daily), default=0
-    ) or 1
-    bars = ""
-    for d in daily:
-        segs = "".join(
-            f"<div class='bar {a}' style='height:{d[a] / peak * 100:.1f}px'></div>"
-            for a in ("BAN", "DELETE", "REVIEW") if d[a]
-        )
-        bars += f"<div class=col>{segs}<span>{d['day'][5:]}</span></div>"
-
-    rate = acc["overturn_rate"]
-    rate_text = f"{rate * 100:.0f}%" if rate is not None else "—"
-    accuracy_block = (
-        f"<div class=cards>"
-        f"<div class=card><div class=n>{acc['bot_actions']}</div>"
-        f"<div class=l>bot decisions</div></div>"
-        f"<div class=card><div class=n>{acc['reviewed']}</div>"
-        f"<div class=l>reviewed by a human</div></div>"
-        f"<div class=card><div class=n>{acc['overturned']}</div>"
-        f"<div class=l>overturned</div></div>"
-        f"<div class=card><div class=n>{rate_text}</div>"
-        f"<div class=l>overturn rate</div></div></div>"
-        f"<div class=note><strong>Read this as an upper bound, not a "
-        f"measurement.</strong> Only {acc['reviewed']} of {acc['bot_actions']} "
-        f"decisions were reviewed, and nobody taps a button on the obviously "
-        f"correct ones — so the sample is biased toward mistakes. It is "
-        f"directional evidence about your thresholds, not a false-positive "
-        f"rate.</div>"
+    # --- chart + its table view (never color-only) -------------------------
+    day_rows = "".join(
+        f'<tr><td class="num">{d["day"]}</td><td class="num">{d["BAN"]}</td>'
+        f'<td class="num">{d["DELETE"]}</td><td class="num">{d["REVIEW"]}</td></tr>'
+        for d in reversed(daily)
+    )
+    table_view = (
+        f'<details><summary>&#9656; table view</summary>'
+        f'<div class="wrap" style="margin-top:10px"><table><thead><tr>'
+        f'<th>day</th><th>ban</th><th>delete</th><th>review</th></tr></thead>'
+        f'<tbody>{day_rows}</tbody></table></div></details>'
+    )
+    chart = (
+        f'<div class="card">{render.legend()}{render.bar_chart(daily)}</div>'
+        f'{table_view}'
     )
 
+    # --- accuracy ----------------------------------------------------------
+    rate = acc["overturn_rate"]
+    rate_text = f"{rate * 100:.0f}%" if rate is not None else "&mdash;"
+    acc_tiles = "".join(
+        f'<div class="tile"><div class="v">{v}</div><div class="k">{k}</div></div>'
+        for k, v in (
+            ("decisions made", acc["bot_actions"]),
+            ("reviewed by a human", acc["reviewed"]),
+            ("overturned", acc["overturned"]),
+            ("overturn rate", rate_text),
+        )
+    )
+    if acc["reviewed"]:
+        caveat = (
+            f"<strong>An upper bound, not a measurement.</strong> Only "
+            f"{acc['reviewed']} of {acc['bot_actions']} decisions were reviewed, "
+            f"and nobody taps a button on the obviously correct ones &mdash; so "
+            f"the sample is biased toward mistakes. Directional evidence about "
+            f"your thresholds, not a false-positive rate."
+        )
+    else:
+        caveat = (
+            "<strong>No human has reviewed a decision yet.</strong> Tap Ignore "
+            "or Ban on the alerts in Telegram &mdash; Ignore records the bot as "
+            "wrong, Ban records it as right. Until then there is no evidence "
+            "either way about whether these thresholds are safe to enforce with."
+        )
+
+    # --- tables ------------------------------------------------------------
     chat_rows = "".join(
-        f"<tr><td><code>{c['chat_id']}</code></td><td>{c['users']}</td>"
-        f"<td><span class='tag BAN'>{c['bans'] or 0}</span></td>"
-        f"<td><span class='tag DELETE'>{c['deletes'] or 0}</span></td>"
-        f"<td><span class='tag REVIEW'>{c['reviews'] or 0}</span></td>"
-        f"<td class=muted>{_ago(c['last'])}</td></tr>"
+        f'<tr><td class="mono">{c["chat_id"]}</td>'
+        f'<td class="num">{c["users"]}</td>'
+        f'<td class="num" style="color:{render.SERIES["BAN"]}">{c["bans"] or 0}</td>'
+        f'<td class="num" style="color:{render.SERIES["DELETE"]}">'
+        f'{c["deletes"] or 0}</td>'
+        f'<td class="num" style="color:{render.SERIES["REVIEW"]}">'
+        f'{c["reviews"] or 0}</td>'
+        f'<td class="dim">{_ago(c["last"])}</td></tr>'
         for c in chats
-    ) or "<tr><td colspan=6 class=muted>no activity yet</td></tr>"
-
+    )
     event_rows = "".join(
-        f"<tr><td class=muted>{_when(ev['ts'])}</td>"
-        f"<td><span class='tag {e(ev['action'])}'>{e(ev['action'])}</span></td>"
-        f"<td>{'@' + e(ev['username']) if ev['username'] else e(ev['user_id'])}</td>"
-        f"<td class=muted><code>{ev['chat_id']}</code></td>"
-        f"<td class=msg>{e(ev['reason'])}</td>"
-        f"<td class=msg>{e(ev['text'])}</td></tr>"
+        f'<tr><td class="dim num">{_when(ev["ts"])}</td>'
+        f'<td><span class="tag" style="background:{_tint(ev["action"])};'
+        f'color:{_ink(ev["action"])}">{e(ev["action"])}</span></td>'
+        f'<td>{"@" + e(ev["username"]) if ev["username"] else e(ev["user_id"])}</td>'
+        f'<td class="mono">{str(ev["chat_id"])[-6:]}</td>'
+        f'<td class="msg">{e(ev["reason"])}</td>'
+        f'<td class="msg dim">{e(ev["text"])}</td></tr>'
         for ev in events
-    ) or "<tr><td colspan=6 class=muted>nothing recorded yet</td></tr>"
-
+    )
     offender_rows = "".join(
-        f"<tr><td>{'@' + e(o['username']) if o['username'] else e(o['user_id'])}</td>"
-        f"<td class=muted><code>{o['chat_id']}</code></td>"
-        f"<td>{o['lifetime']}</td><td>{o['messages_seen']}</td>"
-        f"<td class=muted>{e(o['status'])}</td></tr>"
+        f'<tr><td>{"@" + e(o["username"]) if o["username"] else e(o["user_id"])}</td>'
+        f'<td class="mono">{str(o["chat_id"])[-6:]}</td>'
+        f'<td class="num">{o["lifetime"]}</td>'
+        f'<td class="num dim">{o["messages_seen"]}</td>'
+        f'<td class="dim">{e(o["status"])}</td></tr>'
         for o in offenders
-    ) or "<tr><td colspan=5 class=muted>nobody has a strike</td></tr>"
+    )
 
+    def block(title, sub, head, rows, empty):
+        body = (
+            f'<div class="wrap"><table><thead><tr>{head}</tr></thead>'
+            f'<tbody>{rows}</tbody></table></div>'
+            if rows else f'<div class="wrap"><div class="empty">{empty}</div></div>'
+        )
+        return (
+            f'<section><div class="head"><h2>{title}</h2>'
+            f'<span class="sub">{sub}</span></div>{body}</section>'
+        )
+
+    scope = "" if chat_id is None else f" &middot; group {chat_id}"
     return page(
-        f"<main>"
-        f"<section><h2>Overview</h2><div class=cards>{cards}</div>"
-        f"<p class=muted style='margin-top:10px'>last moderation event "
-        f"{_ago(hp['last_event'])} · this is not a liveness check — a quiet "
-        f"chat also produces nothing. Trust the heartbeat for that.</p></section>"
-        f"<section><h2>Last 14 days</h2><div class=chart>{bars}</div></section>"
-        f"<section><h2>Is it getting it right?</h2>{accuracy_block}</section>"
-        f"<section><h2>Groups</h2><table><tr><th>chat</th><th>users</th>"
-        f"<th>bans</th><th>deletes</th><th>reviews</th><th>last</th></tr>"
-        f"{chat_rows}</table></section>"
-        f"<section><h2>Most strikes</h2><table><tr><th>user</th><th>chat</th>"
-        f"<th>lifetime strikes</th><th>messages</th><th>status</th></tr>"
-        f"{offender_rows}</table></section>"
-        f"<section><h2>Recent decisions</h2><table><tr><th>when (UTC)</th>"
-        f"<th>action</th><th>user</th><th>chat</th><th>why</th><th>message</th></tr>"
-        f"{event_rows}</table></section>"
-        f"</main>",
+        "<main>"
+        + filters
+        + f'<section>{hero}<div class="tiles" style="margin-top:12px">{tiles}'
+          f'</div></section>'
+        + f'<section><div class="head"><h2>Activity</h2>'
+          f'<span class="sub">last {days} days{scope}</span></div>'
+          f'{chart}</section>'
+        + f'<section><div class="head"><h2>Is it getting it right?</h2></div>'
+          f'<div class="tiles">{acc_tiles}</div>'
+          f'<div class="note">{caveat}</div></section>'
+        + block("Groups", "all time",
+                "<th>chat</th><th>members</th><th>bans</th><th>deletes</th>"
+                "<th>reviews</th><th>last</th>",
+                chat_rows, "No group activity yet.")
+        + block("Most strikes", "lifetime, including expired",
+                "<th>member</th><th>chat</th><th>strikes</th><th>messages</th>"
+                "<th>status</th>",
+                offender_rows, "Nobody has a strike.")
+        + block("Recent decisions", f"latest {len(events)}",
+                "<th>when (utc)</th><th>action</th><th>member</th><th>chat</th>"
+                "<th>why</th><th>message</th>",
+                event_rows, "Nothing recorded yet.")
+        + "</main>",
         user_id,
     )
+
+
+def _tint(action: str) -> str:
+    """Muted background for an action pill — a wash of the series hue, so the
+    tag reads as the same entity as its bar without competing with it."""
+    return {
+        "BAN": "#3a1f2a", "DELETE": "#2d2510", "REVIEW": "#152435",
+    }.get(action, "#241f38")
+
+
+def _ink(action: str) -> str:
+    return {
+        "BAN": render.SERIES["BAN"],
+        "DELETE": render.SERIES["DELETE"],
+        "REVIEW": render.SERIES["REVIEW"],
+    }.get(action, render.ADMIN_TINT)
 
 
 @app.get("/healthz")
