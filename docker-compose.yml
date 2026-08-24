@@ -1,0 +1,26 @@
+# ScamGuard — isolated from everything else on this host.
+#
+# No published ports: the bot polls Telegram outbound and listens on nothing,
+# so it cannot collide with other services on the box. Nothing here touches
+# any other project's containers, networks, volumes or nginx configuration.
+
+services:
+  bot:
+    build: .
+    image: scamguard:latest
+    container_name: scamguard-bot
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      # Overrides whatever .env says: inside the container the database must
+      # live on the mounted volume, or a rebuild would erase every record.
+      DB_PATH: /data/scamguard.db
+    volumes:
+      - ./data:/data
+    logging:
+      driver: json-file
+      options:
+        # Cap the logs. This box hosts other production services; an unbounded
+        # log from a chatty bot must never be what fills the disk.
+        max-size: "10m"
+        max-file: "3"

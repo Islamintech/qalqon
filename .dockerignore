@@ -1,0 +1,19 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.git/
+.gitignore
+
+# Never bake secrets or local state into an image. .env is passed at runtime
+# via env_file, and the database lives on a mounted volume.
+.env
+*.db
+*.db-wal
+*.db-shm
+*.session
+*.session-journal
+data/
+
+deploy/
+README.md
