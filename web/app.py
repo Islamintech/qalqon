@@ -221,7 +221,7 @@ async def dashboard(request: Request):
         daily = queries.daily_activity(conn, chat_id, days=days)
         chats = queries.per_chat(conn)
         events = queries.recent_events(conn, chat_id)
-        offenders = queries.top_offenders(conn)
+        offenders = queries.top_offenders(conn, chat_id)
         hp = queries.health(conn)
     finally:
         conn.close()
@@ -240,8 +240,8 @@ async def dashboard(request: Request):
         )
 
     ranges = "".join(chip(f"{d}d", link(days_v=d), d == days) for d in (7, 14, 30))
-    chat_chips = chip("All", link(chat_v=None), chat_id is None) + "".join(
-        chip(e(str(c["chat_id"])[-6:]), link(chat_v=c["chat_id"]),
+    chat_chips = chip("All groups", link(chat_v=None), chat_id is None) + "".join(
+        chip(e(c["title"] or str(c["chat_id"])[-6:]), link(chat_v=c["chat_id"]),
              chat_id == c["chat_id"])
         for c in chats[:6]
     )
@@ -253,18 +253,23 @@ async def dashboard(request: Request):
     )
 
     # --- hero + tiles ------------------------------------------------------
+    selected = next((c for c in chats if c["chat_id"] == chat_id), None)
+    group_name = (selected or {}).get("title") or (
+        str(chat_id) if chat_id is not None else ""
+    )
     period_actions = sum(d["REVIEW"] + d["DELETE"] + d["BAN"] for d in daily)
     per_day = period_actions / days if days else 0
     hero = (
         f'<div class="hero"><span class="v">{period_actions}</span>'
-        f'<span class="k">moderation actions in the last {days} days<br>'
+        f'<span class="k">moderation actions in the last {days} days'
+        f'{" in " + e(group_name) if chat_id is not None else " across all groups"}<br>'
         f'<span class="dim">{per_day:.1f} per day &middot; last activity '
         f'{_ago(hp["last_event"])}</span></span></div>'
     )
     tiles = "".join(
         f'<div class="tile"><div class="v">{v}</div><div class="k">{k}</div></div>'
         for k, v in (
-            ("groups watched", len(chats)),
+            (f"group{'' if len(chats) == 1 else 's'} watched", len(chats)),
             ("known members", ov["users"]),
             ("messages seen", ov["messages_seen"]),
             ("active strikes", ov["active_strikes"]),
@@ -319,17 +324,6 @@ async def dashboard(request: Request):
         )
 
     # --- tables ------------------------------------------------------------
-    chat_rows = "".join(
-        f'<tr><td class="mono">{c["chat_id"]}</td>'
-        f'<td class="num">{c["users"]}</td>'
-        f'<td class="num" style="color:{render.SERIES["BAN"]}">{c["bans"] or 0}</td>'
-        f'<td class="num" style="color:{render.SERIES["DELETE"]}">'
-        f'{c["deletes"] or 0}</td>'
-        f'<td class="num" style="color:{render.SERIES["REVIEW"]}">'
-        f'{c["reviews"] or 0}</td>'
-        f'<td class="dim">{_ago(c["last"])}</td></tr>'
-        for c in chats
-    )
     event_rows = "".join(
         f'<tr><td class="dim num">{_when(ev["ts"])}</td>'
         f'<td><span class="tag" style="background:{_tint(ev["action"])};'
@@ -360,7 +354,7 @@ async def dashboard(request: Request):
             f'<span class="sub">{sub}</span></div>{body}</section>'
         )
 
-    scope = "" if chat_id is None else f" &middot; group {chat_id}"
+    scope = "" if chat_id is None else f" &middot; {e(group_name)}"
     return page(
         "<main>"
         + filters
@@ -372,11 +366,14 @@ async def dashboard(request: Request):
         + f'<section><div class="head"><h2>Is it getting it right?</h2></div>'
           f'<div class="tiles">{acc_tiles}</div>'
           f'<div class="note">{caveat}</div></section>'
-        + block("Groups", "all time",
-                "<th>chat</th><th>members</th><th>bans</th><th>deletes</th>"
-                "<th>reviews</th><th>last</th>",
-                chat_rows, "No group activity yet.")
-        + block("Most strikes", "lifetime, including expired",
+        + f'<section><div class="head"><h2>Groups</h2>'
+          f'<span class="sub">{len(chats)} watched &middot; all time &middot; '
+          f'click one to filter</span></div>'
+          f'{render.group_cards(chats, lambda cid: link(chat_v=cid), e, _ago)}'
+          f'</section>'
+        + block("Most strikes",
+                "lifetime, including expired"
+                + ("" if chat_id is None else f" &middot; {e(group_name)}"),
                 "<th>member</th><th>chat</th><th>strikes</th><th>messages</th>"
                 "<th>status</th>",
                 offender_rows, "Nobody has a strike.")

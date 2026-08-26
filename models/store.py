@@ -29,7 +29,7 @@ STATUS_WHITELISTED = "whitelisted"
 STATUS_BANNED = "banned"
 
 DAY = 86400.0
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS users (
@@ -61,6 +61,12 @@ CREATE TABLE IF NOT EXISTS events (
     text      TEXT    NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS events_user ON events (chat_id, user_id, ts DESC);
+CREATE TABLE IF NOT EXISTS chats (
+    chat_id    INTEGER PRIMARY KEY,
+    title      TEXT NOT NULL DEFAULT '',
+    first_seen REAL NOT NULL DEFAULT 0,
+    last_seen  REAL NOT NULL DEFAULT 0
+);
 CREATE TABLE IF NOT EXISTS meta (
     key   TEXT PRIMARY KEY,
     value TEXT NOT NULL
@@ -107,6 +113,9 @@ class Store:
         self._decay_days = max(int(decay_days), 0)
         self._lock = asyncio.Lock()
         self._conn: sqlite3.Connection | None = None
+        # Last title written per chat, so a rename is persisted but an
+        # unchanged name is not rewritten on every single message.
+        self._chat_titles: dict[int, str] = {}
 
     @property
     def decay_days(self) -> int:
@@ -326,6 +335,41 @@ class Store:
 
         return await self._run(_touch, chat_id, user_id, username, cutoff)
 
+    async def remember_chat(self, chat_id: int, title: str) -> None:
+        """Record a group's name so the dashboard can show something a human
+        recognises instead of -1004492159049.
+
+        Guarded in memory: the title only changes when someone renames the
+        group, so writing it on every message would be a pointless write on the
+        hot path.
+        """
+        if title and self._chat_titles.get(chat_id) == title:
+            return
+        self._chat_titles[chat_id] = title
+
+        def _remember(conn, chat_id, title):
+            now = time.time()
+            conn.execute(
+                "INSERT INTO chats (chat_id,title,first_seen,last_seen) "
+                "VALUES (?,?,?,?) ON CONFLICT(chat_id) DO UPDATE SET "
+                "  title = CASE WHEN excluded.title != '' THEN excluded.title "
+                "               ELSE chats.title END, "
+                "  last_seen = excluded.last_seen",
+                (chat_id, title or "", now, now),
+            )
+            conn.commit()
+
+        await self._run(_remember, chat_id, title)
+
+    async def chats(self) -> list[dict]:
+        def _chats(conn):
+            return [dict(r) for r in conn.execute(
+                "SELECT chat_id, title, first_seen, last_seen FROM chats "
+                "ORDER BY last_seen DESC"
+            ).fetchall()]
+
+        return await self._run(_chats)
+
     async def add_strike(
         self, chat_id: int, user_id: int, n: int = 1, ts: float | None = None
     ) -> int:
@@ -431,12 +475,17 @@ def _migrate(conn: sqlite3.Connection) -> None:
     have to when they offended. Erring toward last_seen (recent) rather than
     first_seen keeps existing offenders under watch instead of silently
     forgiving everyone the moment this ships.
+
+    v2 -> v3: group titles were never stored, so the dashboard could only show
+    numeric ids. Every chat we already know about is registered with an empty
+    title; the real name fills in on that group's next message.
     """
     row = conn.execute("SELECT value FROM meta WHERE key='schema_version'").fetchone()
-    if row is not None and int(row["value"]) >= SCHEMA_VERSION:
+    version = int(row["value"]) if row is not None else 0
+    if version >= SCHEMA_VERSION:
         return
 
-    if row is None:
+    if version < 2:
         # No marker: either a brand-new DB or an untracked v1. Only backfill if
         # there is v1 data to convert and nothing in the strikes table yet.
         has_strikes = conn.execute("SELECT COUNT(*) FROM strikes").fetchone()[0]
@@ -449,6 +498,12 @@ def _migrate(conn: sqlite3.Connection) -> None:
                     "INSERT INTO strikes (chat_id,user_id,ts) VALUES (?,?,?)",
                     [(u["chat_id"], u["user_id"], when)] * u["strikes"],
                 )
+
+    # v2 -> v3: register known chats so they appear before their next message.
+    conn.execute(
+        "INSERT OR IGNORE INTO chats (chat_id, title, first_seen, last_seen) "
+        "SELECT DISTINCT chat_id, '', 0, 0 FROM users"
+    )
 
     conn.execute(
         "INSERT INTO meta (key,value) VALUES ('schema_version',?) "

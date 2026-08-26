@@ -117,6 +117,22 @@ h2{{font-size:12px;text-transform:uppercase;letter-spacing:.09em;
   fill:{INK_MUTED};font-variant-numeric:tabular-nums}}
 .chart .seg:hover{{opacity:.82}}
 
+/* ---------- group cards ---------- */
+.gcards{{display:grid;grid-template-columns:repeat(auto-fill,minmax(258px,1fr));
+  gap:12px}}
+.gcard{{background:{SURFACE};border:1px solid {HAIRLINE};border-radius:12px;
+  padding:15px 17px;display:block;color:inherit}}
+.gcard:hover{{text-decoration:none;border-color:#33405c;background:#1a1e28}}
+.gname{{font-size:15px;font-weight:640;letter-spacing:-.01em;margin-bottom:2px}}
+.gid{{font-size:11px;margin-bottom:12px}}
+.gstats{{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:11px}}
+.gstat{{font-size:11.5px;color:{INK_MUTED};display:flex;align-items:baseline;
+  gap:5px}}
+.gstat b{{font-size:21px;font-weight:660;letter-spacing:-.02em}}
+.gfoot{{font-size:11.5px;color:{INK_2}}}
+.gfoot.dim{{color:{INK_MUTED};margin-top:2px}}
+.back{{font-size:12.5px;color:{INK_MUTED};display:inline-block;margin-bottom:10px}}
+
 /* ---------- tables ---------- */
 .wrap{{overflow-x:auto;border:1px solid {HAIRLINE};border-radius:12px;
   background:{SURFACE}}}
@@ -263,6 +279,50 @@ def bar_chart(daily: list[dict], height: int = 190) -> str:
         )
     out.append("</svg>")
     return "".join(out)
+
+
+def group_cards(chats: list[dict], href, escape, ago) -> str:
+    """One card per group: its NAME first, then what the bot has actually done
+    there.
+
+    A table of chat ids answered "how many" but never "which one" — the whole
+    point of watching several groups is knowing which is having trouble. The
+    two numbers that matter are given the most room: messages removed, and
+    members banned.
+    """
+    if not chats:
+        return (
+            '<div class="wrap"><div class="empty">No groups yet. Add the bot '
+            'to a group and post a message.</div></div>'
+        )
+
+    cards = []
+    for c in chats:
+        name = escape(c["title"]) if c["title"] else "Unnamed group"
+        unnamed = "" if c["title"] else (
+            ' <span class="dim" style="font-size:11px">'
+            '(name appears after its next message)</span>'
+        )
+        quiet = (c["bans"] + c["deletes"] + c["reviews"]) == 0
+        cards.append(
+            f'<a class="gcard" href="{href(c["chat_id"])}">'
+            f'<div class="gname">{name}{unnamed}</div>'
+            f'<div class="gid mono">{c["chat_id"]}</div>'
+            f'<div class="gstats">'
+            f'<span class="gstat"><b style="color:{SERIES["DELETE"]}">'
+            f'{c["deletes"]}</b> deleted</span>'
+            f'<span class="gstat"><b style="color:{SERIES["BAN"]}">'
+            f'{c["bans"]}</b> banned</span>'
+            f'<span class="gstat"><b style="color:{SERIES["REVIEW"]}">'
+            f'{c["reviews"]}</b> to review</span>'
+            f'</div>'
+            f'<div class="gfoot">{c["members"]} members · {c["messages"]} '
+            f'messages seen · {c["banned_now"]} currently banned</div>'
+            f'<div class="gfoot dim">'
+            f'{"no incidents yet" if quiet else "last action " + ago(c["last_action"])}'
+            f'</div></a>'
+        )
+    return f'<div class="gcards">{"".join(cards)}</div>'
 
 
 def legend(keys=None) -> str:

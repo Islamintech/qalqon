@@ -111,22 +111,55 @@ def accuracy(conn, chat_id: int | None = None) -> dict:
 
 
 def per_chat(conn) -> list[dict]:
+    """One row per group the bot has ever seen, with everything the overview
+    needs: the NAME (not just the id), how much it has moderated, and how many
+    members are on record.
+
+    Built from the chats table so a quiet group still appears — a group with
+    zero incidents is a fact worth showing, and joining off events alone would
+    hide exactly the groups that are behaving.
+    """
     rows = conn.execute(
-        "SELECT chat_id, COUNT(*) AS events, "
-        "  SUM(action='BAN') AS bans, "
-        "  SUM(action='DELETE') AS deletes, "
-        "  SUM(action='REVIEW') AS reviews, "
-        "  MAX(ts) AS last "
-        "FROM events WHERE action IN ('REVIEW','DELETE','BAN') "
-        "GROUP BY chat_id ORDER BY events DESC"
+        """
+        SELECT
+          c.chat_id,
+          c.title,
+          c.last_seen,
+          (SELECT COUNT(*)                FROM users u  WHERE u.chat_id = c.chat_id) AS members,
+          (SELECT COALESCE(SUM(u.messages_seen),0)
+                                          FROM users u  WHERE u.chat_id = c.chat_id) AS messages,
+          (SELECT COUNT(*)                FROM users u  WHERE u.chat_id = c.chat_id
+                                            AND u.status = 'banned')                 AS banned_now,
+          (SELECT COUNT(*)                FROM strikes s WHERE s.chat_id = c.chat_id) AS strikes,
+          (SELECT COUNT(*) FROM events e WHERE e.chat_id = c.chat_id AND e.action='BAN')    AS bans,
+          (SELECT COUNT(*) FROM events e WHERE e.chat_id = c.chat_id AND e.action='DELETE') AS deletes,
+          (SELECT COUNT(*) FROM events e WHERE e.chat_id = c.chat_id AND e.action='REVIEW') AS reviews,
+          (SELECT MAX(ts)  FROM events e WHERE e.chat_id = c.chat_id)                       AS last_action
+        FROM chats c
+        """
     ).fetchall()
-    out = []
-    for r in rows:
-        users = conn.execute(
-            "SELECT COUNT(*) FROM users WHERE chat_id=?", (r["chat_id"],)
-        ).fetchone()[0]
-        out.append({**dict(r), "users": users})
+    out = [dict(r) for r in rows]
+
+    # A chat that has events but was never registered (pre-v3 data) must not
+    # vanish from the list just because we never learned its name.
+    for r in conn.execute(
+        "SELECT DISTINCT chat_id FROM events WHERE chat_id NOT IN "
+        "(SELECT chat_id FROM chats)"
+    ).fetchall():
+        out.append({
+            "chat_id": r["chat_id"], "title": "", "last_seen": None,
+            "members": 0, "messages": 0, "banned_now": 0, "strikes": 0,
+            "bans": 0, "deletes": 0, "reviews": 0, "last_action": None,
+        })
+    out.sort(key=lambda c: (c["bans"] + c["deletes"] + c["reviews"]), reverse=True)
     return out
+
+
+def chat_title(conn, chat_id: int) -> str:
+    row = conn.execute(
+        "SELECT title FROM chats WHERE chat_id = ?", (chat_id,)
+    ).fetchone()
+    return (row["title"] if row else "") or ""
 
 
 def recent_events(conn, chat_id: int | None = None, limit: int = 60) -> list[dict]:
@@ -142,11 +175,14 @@ def recent_events(conn, chat_id: int | None = None, limit: int = 60) -> list[dic
     return [dict(r) for r in rows]
 
 
-def top_offenders(conn, limit: int = 10) -> list[dict]:
+def top_offenders(conn, chat_id: int | None = None, limit: int = 10) -> list[dict]:
+    scope = "AND chat_id = ?" if chat_id is not None else ""
+    args = (chat_id, limit) if chat_id is not None else (limit,)
     rows = conn.execute(
-        "SELECT chat_id, user_id, username, strikes AS lifetime, status, messages_seen "
-        "FROM users WHERE strikes > 0 ORDER BY strikes DESC LIMIT ?",
-        (limit,),
+        "SELECT chat_id, user_id, username, strikes AS lifetime, status, "
+        "messages_seen FROM users WHERE strikes > 0 "
+        f"{scope} ORDER BY strikes DESC LIMIT ?",
+        args,
     ).fetchall()
     return [dict(r) for r in rows]
 

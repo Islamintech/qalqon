@@ -117,6 +117,8 @@ class ModerationModel(Observable):
         # An edit re-judges a message we may already have passed, so it must not
         # inflate the sender's message count — otherwise editing one message
         # repeatedly would farm tenure toward the trust threshold.
+        if msg.chat_title:
+            await self._store.remember_chat(msg.chat_id, msg.chat_title)
         record = (
             await self._store.get(msg.chat_id, msg.user_id) if msg.edited
             else await self._store.touch(msg.chat_id, msg.user_id, msg.username)
