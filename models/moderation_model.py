@@ -30,7 +30,7 @@ from .policy import Policy, file_decision
 from .store import STATUS_BANNED, STATUS_NORMAL, STATUS_WHITELISTED, Store
 from .verdict import Action, Risk, Verdict
 
-log = logging.getLogger("scamguard.model")
+log = logging.getLogger("qalqon.model")
 
 # Below this length, a message with no link/mention/keyword hit is not worth an
 # LLM call. Short group chatter ("ok", "thanks") is most of the traffic.

@@ -34,12 +34,12 @@ class Settings:
     # Leave the api creds empty to keep this off; the bot runs fine without it.
     mtproto_api_id: str = os.getenv("TELEGRAM_API_ID", "")
     mtproto_api_hash: str = os.getenv("TELEGRAM_API_HASH", "")
-    mtproto_session: str = os.getenv("MTPROTO_SESSION", "scamguard_user")
+    mtproto_session: str = os.getenv("MTPROTO_SESSION", "qalqon_user")
     mtproto_scan_limit: int = int(os.getenv("MTPROTO_SCAN_LIMIT", "40"))
     mtproto_cache_ttl: int = int(os.getenv("MTPROTO_CACHE_TTL", "21600"))
 
     # Phase 3 — memory, strikes and trust.
-    db_path: str = os.getenv("DB_PATH", "scamguard.db")
+    db_path: str = os.getenv("DB_PATH", "qalqon.db")
     # How many strikes before the response escalates one step (REVIEW->DELETE
     # ->BAN). Lower = harsher on repeat offenders.
     strikes_to_escalate: int = int(os.getenv("STRIKES_TO_ESCALATE", "2"))

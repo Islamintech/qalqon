@@ -30,7 +30,7 @@ import httpx
 
 from .verdict import Verdict, Risk
 
-log = logging.getLogger("scamguard.vision")
+log = logging.getLogger("qalqon.vision")
 
 HF_NSFW_MODEL = "Falconsai/nsfw_image_detection"
 HF_ROUTER = "https://router.huggingface.co/hf-inference/models"

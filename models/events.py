@@ -27,7 +27,7 @@ from dataclasses import dataclass, field
 
 from .verdict import Action, Verdict
 
-log = logging.getLogger("scamguard.events")
+log = logging.getLogger("qalqon.events")
 
 
 # --- events ----------------------------------------------------------------

@@ -1,4 +1,4 @@
-# ScamGuard — isolated from everything else on this host.
+# Qalqon — isolated from everything else on this host.
 #
 # No published ports: the bot polls Telegram outbound and listens on nothing,
 # so it cannot collide with other services on the box. Nothing here touches
@@ -7,8 +7,8 @@
 services:
   bot:
     build: .
-    image: scamguard:latest
-    container_name: scamguard-bot
+    image: qalqon:latest
+    container_name: qalqon-bot
     restart: unless-stopped
     # Run as the host user that owns ./data. A bind mount keeps the HOST's
     # ownership, so a container user the host does not know cannot write to it.
@@ -20,7 +20,7 @@ services:
     environment:
       # Overrides whatever .env says: inside the container the database must
       # live on the mounted volume, or a rebuild would erase every record.
-      DB_PATH: /data/scamguard.db
+      DB_PATH: /data/qalqon.db
     volumes:
       - ./data:/data
     logging:
@@ -34,13 +34,13 @@ services:
   # Read-only dashboard. Optional: `docker compose up -d web` to start it.
   web:
     build: .
-    image: scamguard:latest
-    container_name: scamguard-web
+    image: qalqon:latest
+    container_name: qalqon-web
     restart: unless-stopped
     user: "${PUID:-1000}:${PGID:-1000}"
     env_file: .env
     environment:
-      DB_PATH: /data/scamguard.db
+      DB_PATH: /data/qalqon.db
     volumes:
       # Read-only mount as well as a read-only SQLite connection. Two
       # independent guarantees that the panel cannot alter moderation state.

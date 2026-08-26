@@ -1,17 +1,17 @@
 [Unit]
-Description=ScamGuard dashboard (read-only)
+Description=Qalqon dashboard (read-only)
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=simple
-User=scamguard
-Group=scamguard
-WorkingDirectory=/opt/scamguard
+User=qalqon
+Group=qalqon
+WorkingDirectory=/opt/qalqon
 # Bound to localhost only. The reverse proxy (Caddy/nginx) terminates TLS and
 # is the sole public entry point — the panel renders private group messages,
 # so it must never be reachable directly over plain HTTP.
-ExecStart=/opt/scamguard/.venv/bin/uvicorn web.app:app --host 127.0.0.1 --port 8080
+ExecStart=/opt/qalqon/.venv/bin/uvicorn web.app:app --host 127.0.0.1 --port 8080
 
 Restart=always
 RestartSec=10
@@ -22,7 +22,7 @@ RestartSec=10
 
 StandardOutput=journal
 StandardError=journal
-SyslogIdentifier=scamguard-web
+SyslogIdentifier=qalqon-web
 
 NoNewPrivileges=true
 PrivateTmp=true
@@ -31,7 +31,7 @@ ProtectHome=true
 RestrictSUIDSGID=true
 # Read-write because SQLite needs to create the -shm/-wal sidecar files even
 # for readers. The connection itself is opened mode=ro.
-ReadWritePaths=/opt/scamguard
+ReadWritePaths=/opt/qalqon
 
 [Install]
 WantedBy=multi-user.target

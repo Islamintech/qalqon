@@ -18,9 +18,9 @@ from models.store import (
 from views import TelegramView
 from views.telegram_view import parse_callback, VERB_BAN, VERB_UNBAN
 
-log = logging.getLogger("scamguard.admin")
+log = logging.getLogger("qalqon.admin")
 
-HELP = """ScamGuard admin commands
+HELP = """Qalqon admin commands
 
 /stats                     — totals for this chat
 /status <user_id>          — one user's record and recent events
@@ -103,7 +103,7 @@ class AdminController:
         actions = ", ".join(f"{k}={v}" for k, v in sorted(s["actions"].items())) or "none"
         decay = f"{self._store.decay_days}d" if self._store.decay_days else "never"
         await update.effective_message.reply_text(
-            f"📊 ScamGuard — {'all chats' if scope is None else f'chat {scope}'}\n"
+            f"📊 Qalqon — {'all chats' if scope is None else f'chat {scope}'}\n"
             f"known users: {s['users']}\n"
             f"with active strikes: {s['users_with_strikes']} "
             f"({s['active_strikes']} strikes total)\n"

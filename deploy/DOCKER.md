@@ -17,8 +17,8 @@ nginx change, no firewall rule.
 ## Install
 
 ```bash
-mkdir -p ~/apps/scamguard && cd ~/apps/scamguard
-git clone git@github.com:<owner>/scam-guard.git .
+mkdir -p ~/apps/qalqon && cd ~/apps/qalqon
+git clone git@github.com:<owner>/qalqon.git .
 cp .env.example .env && nano .env      # real values
 chmod 600 .env
 docker compose build
@@ -44,10 +44,10 @@ docker compose logs -f bot
 user the host does not know cannot write to it — the bot crash-loops on
 `unable to open database file`. `docker-compose.yml` therefore runs as
 `${PUID:-1000}:${PGID:-1000}`. If your user is not uid 1000, put `PUID`/`PGID`
-in `.env`. Matching uids also keeps `scamguard.db` readable from the host for
+in `.env`. Matching uids also keeps `qalqon.db` readable from the host for
 backups, which a root-owned file would not be.
 
-**`DB_PATH` is overridden in compose** to `/data/scamguard.db`. The database
+**`DB_PATH` is overridden in compose** to `/data/qalqon.db`. The database
 must live on the mounted volume; inside the image a rebuild would erase every
 strike, whitelist and ban record.
 
@@ -75,7 +75,7 @@ that exits non-zero:
 
 ```bash
 docker run -d --restart unless-stopped --name restart-test \
-  scamguard:latest python -c "import sys; sys.exit(1)"
+  qalqon:latest python -c "import sys; sys.exit(1)"
 sleep 20 && docker inspect -f '{{.RestartCount}}' restart-test   # climbing
 docker rm -f restart-test
 ```
@@ -87,7 +87,7 @@ casual check.
 ## Backups
 
 ```cron
-0 4 * * * cd /home/<user>/apps/scamguard && sqlite3 data/scamguard.db ".backup 'data/backup-$(date +\%F).db'" && find data -name 'backup-*.db' -mtime +14 -delete
+0 4 * * * cd /home/<user>/apps/qalqon && sqlite3 data/qalqon.db ".backup 'data/backup-$(date +\%F).db'" && find data -name 'backup-*.db' -mtime +14 -delete
 ```
 
 `.backup` is safe against a live database; `cp` while the bot writes is not.

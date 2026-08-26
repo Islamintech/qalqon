@@ -22,7 +22,7 @@ import asyncio
 import logging
 import time
 
-log = logging.getLogger("scamguard.heartbeat")
+log = logging.getLogger("qalqon.heartbeat")
 
 
 def _duration(seconds: float) -> str:
@@ -67,7 +67,7 @@ class Heartbeat:
         self._started_at = time.time()
         self._baseline = await self._snapshot()
         try:
-            await send(f"✅ ScamGuard started\n{detail}" if detail else "✅ ScamGuard started")
+            await send(f"✅ Qalqon started\n{detail}" if detail else "✅ Qalqon started")
         except Exception as exc:
             log.warning("startup notice failed: %s", exc)
 
@@ -76,7 +76,7 @@ class Heartbeat:
         or the machine went away."""
         try:
             await send(
-                f"⏹ ScamGuard stopping (clean shutdown)\n"
+                f"⏹ Qalqon stopping (clean shutdown)\n"
                 f"uptime {_duration(time.time() - self._started_at)}"
             )
         except Exception as exc:
@@ -85,7 +85,7 @@ class Heartbeat:
     async def beat(self, send) -> None:
         now = await self._snapshot()
         body = (
-            f"💚 ScamGuard still running\n"
+            f"💚 Qalqon still running\n"
             f"uptime {_duration(time.time() - self._started_at)}\n"
             f"since last check: {self._delta(now)}\n\n"
             "If this stops arriving, the bot is down."

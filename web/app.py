@@ -43,10 +43,10 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(name)s %(levelname)s %(message)s",
 )
-log = logging.getLogger("scamguard.web")
-app = FastAPI(title="ScamGuard", docs_url=None, redoc_url=None, openapi_url=None)
+log = logging.getLogger("qalqon.web")
+app = FastAPI(title="Qalqon", docs_url=None, redoc_url=None, openapi_url=None)
 
-COOKIE = "scamguard_session"
+COOKIE = "qalqon_session"
 SECRET = session_secret(settings.web_session_secret, settings.telegram_token)
 ALLOWED = settings.web_admin_ids
 
@@ -91,9 +91,9 @@ def page(body: str, user_id: int | None = None) -> HTMLResponse:
         "<!doctype html><html lang=en><head><meta charset=utf-8>"
         "<meta name=viewport content='width=device-width,initial-scale=1'>"
         "<meta name=robots content='noindex,nofollow'>"
-        "<title>ScamGuard</title>"
+        "<title>Qalqon</title>"
         f"<style>{render.CSS}</style></head><body>"
-        f'<header><span class="brand">{render.LOGO} ScamGuard</span>'
+        f'<header><span class="brand">{render.LOGO} Qalqon</span>'
         f'<span class="badge {cls}">{mode}</span>'
         f'<span class="sub">{e(settings.autonomy)}</span>'
         f'<span class="spacer"></span>{who}</header>{body}</body></html>'

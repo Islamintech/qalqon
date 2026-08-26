@@ -4,5 +4,5 @@ __pycache__/
 .env
 *.session
 *.session-journal
-scamguard.db
+qalqon.db
 .pytest_cache/

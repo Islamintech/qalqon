@@ -60,7 +60,7 @@ async def on_error(update: object, context) -> None:
     itself, so we stop rather than fight over the update stream.
     """
     err = context.error
-    log = logging.getLogger("scamguard")
+    log = logging.getLogger("qalqon")
 
     if isinstance(err, Conflict):
         log.critical(
@@ -170,14 +170,14 @@ def main() -> None:
         # A quiet chat would never hit the opportunistic prune in add_strike.
         pruned = await store.prune_strikes()
         if pruned:
-            logging.getLogger("scamguard").info("pruned %s expired strikes", pruned)
+            logging.getLogger("qalqon").info("pruned %s expired strikes", pruned)
         await mtproto.start()
 
         async def _send_digest(body: str) -> None:
             if settings.admin_chat_id:
                 await app.bot.send_message(chat_id=settings.admin_chat_id, text=body)
             else:
-                logging.getLogger("scamguard").info("DIGEST:\n%s", body)
+                logging.getLogger("qalqon").info("DIGEST:\n%s", body)
 
         await digest.start(_send_digest)
 
@@ -251,7 +251,7 @@ def main() -> None:
     )
 
     mode = "DRY-RUN (no deletes/bans)" if settings.dry_run else "LIVE"
-    logging.getLogger("scamguard").info(
+    logging.getLogger("qalqon").info(
         "starting %s | photo:%s | channel-deep-scan:%s | db:%s | "
         "strikes-to-escalate:%s | trust-after:%s msgs | strike-decay:%s | "
         "skip-admins:%s | autonomy:%s | digest:%.0fs",

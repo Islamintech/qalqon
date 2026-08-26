@@ -17,7 +17,7 @@ import asyncio
 import logging
 import time
 
-log = logging.getLogger("scamguard.alerts")
+log = logging.getLogger("qalqon.alerts")
 
 
 class AlertBatcher:
@@ -87,7 +87,7 @@ class AlertBatcher:
         extra = f"\n…and {suppressed} more" if suppressed else ""
         total = len(lines) + suppressed
         await send(
-            f"🌊 ScamGuard digest — {total} alerts while under load\n"
+            f"🌊 Qalqon digest — {total} alerts while under load\n"
             f"{body}{extra}\n\n"
             "Individual alerts are batched while volume is high. "
             "Use /status <user_id> to review one, /stats for totals."

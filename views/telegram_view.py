@@ -26,7 +26,7 @@ from models.verdict import Action
 
 from .alert_batcher import AlertBatcher
 
-log = logging.getLogger("scamguard.view")
+log = logging.getLogger("qalqon.view")
 
 # callback_data is capped at 64 bytes by Telegram, so keep this format tight:
 #   mod|<verb>|<chat_id>|<user_id>
@@ -165,7 +165,7 @@ class TelegramView:
             "photo screening": "Text, link and file checks still run",
         }.get(e.subsystem, "Other checks still run")
         await self.report_to_admins(
-            f"⚠️ ScamGuard {e.subsystem} is DEGRADED\n"
+            f"⚠️ Qalqon {e.subsystem} is DEGRADED\n"
             f"Unreachable: {e.reason[:200]}\n"
             f"{still_working}, but this signal is missing until it recovers. "
             "Nothing is being auto-banned on its behalf."

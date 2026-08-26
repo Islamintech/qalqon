@@ -57,7 +57,7 @@ async def check_telegram(chat_id: int | None) -> None:
         try:
             await bot.send_message(
                 chat_id=settings.admin_chat_id,
-                text="✅ ScamGuard preflight: alerts will arrive here.",
+                text="✅ Qalqon preflight: alerts will arrive here.",
             )
             record(OK, f"admin chat {settings.admin_chat_id} reachable")
         except TelegramError as exc:
@@ -197,7 +197,7 @@ async def main() -> None:
             print(f"not a chat id: {sys.argv[1]}")
             raise SystemExit(2)
 
-    print("ScamGuard preflight\n" + "=" * 60)
+    print("Qalqon preflight\n" + "=" * 60)
     try:
         settings.validate()
         record(OK, "required environment variables present")

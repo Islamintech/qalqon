@@ -24,7 +24,7 @@ import logging
 import time
 from base64 import urlsafe_b64decode, urlsafe_b64encode
 
-log = logging.getLogger("scamguard.web.auth")
+log = logging.getLogger("qalqon.web.auth")
 
 # A login payload older than this is refused. Telegram recommends a short
 # window; the widget redirects immediately, so a minute is generous.
@@ -125,7 +125,7 @@ def session_secret(configured: str, bot_token: str) -> str:
     """
     if configured:
         return configured
-    return hashlib.sha256(f"scamguard-web-session:{bot_token}".encode()).hexdigest()
+    return hashlib.sha256(f"qalqon-web-session:{bot_token}".encode()).hexdigest()
 
 
 def verify_access_token(supplied: str, configured: str) -> bool:

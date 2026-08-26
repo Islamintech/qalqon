@@ -22,7 +22,7 @@ detecting is the failure mode this whole project keeps designing against.
 import logging
 import time
 
-log = logging.getLogger("scamguard.admins")
+log = logging.getLogger("qalqon.admins")
 
 
 class AdminCache:

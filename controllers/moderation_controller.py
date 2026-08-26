@@ -21,7 +21,7 @@ from models.moderation_model import (
     Attachment, IncomingMessage, JoiningMember, ModerationModel,
 )
 
-log = logging.getLogger("scamguard.controller")
+log = logging.getLogger("qalqon.controller")
 
 # Every attachment kind that can carry a payload. A fake APK renamed to .mp4 is
 # still a fake APK, so document-only screening left a gap.

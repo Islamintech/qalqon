@@ -1,17 +1,17 @@
 [Unit]
-Description=ScamGuard — Telegram anti-scam moderation bot
+Description=Qalqon — Telegram anti-scam moderation bot
 Documentation=https://github.com/
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=simple
-User=scamguard
-Group=scamguard
-WorkingDirectory=/opt/scamguard
+User=qalqon
+Group=qalqon
+WorkingDirectory=/opt/qalqon
 # python-dotenv reads .env from WorkingDirectory, so credentials never appear
 # in this unit file (which is world-readable) or in `systemctl show` output.
-ExecStart=/opt/scamguard/.venv/bin/python main.py
+ExecStart=/opt/qalqon/.venv/bin/python main.py
 
 # Restart on ANY exit, including a clean one. A moderation bot that has stopped
 # is invisible: the groups look protected while nobody is watching them.
@@ -29,11 +29,11 @@ StartLimitBurst=5
 # stop_running(); the restart is harmless because the other instance keeps the
 # token and this one will keep exiting — visible as a restart loop.
 
-# Logs go to the journal: `journalctl -u scamguard -f`. Rotation and retention
+# Logs go to the journal: `journalctl -u qalqon -f`. Rotation and retention
 # are journald's job, configured centrally in /etc/systemd/journald.conf.
 StandardOutput=journal
 StandardError=journal
-SyslogIdentifier=scamguard
+SyslogIdentifier=qalqon
 
 # Hardening. The bot needs outbound network, its own directory, and nothing
 # else — a compromised dependency should not be able to read /etc or /home.
@@ -47,7 +47,7 @@ ProtectControlGroups=true
 RestrictSUIDSGID=true
 # The only writable path: the SQLite database, the .session file and .env live
 # here. Everything else on disk is read-only to this process.
-ReadWritePaths=/opt/scamguard
+ReadWritePaths=/opt/qalqon
 
 [Install]
 WantedBy=multi-user.target

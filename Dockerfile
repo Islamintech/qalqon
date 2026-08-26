@@ -21,10 +21,10 @@ COPY . .
 
 # Run as a non-root user. A moderation bot parses hostile input by definition,
 # so a container escape should not land on root.
-RUN useradd --system --uid 10001 scamguard \
+RUN useradd --system --uid 10001 qalqon \
     && mkdir -p /data \
-    && chown -R scamguard:scamguard /data /app
-USER scamguard
+    && chown -R qalqon:qalqon /data /app
+USER qalqon
 
 # The database lives on a mounted volume, never inside the image — a rebuild
 # must not wipe every strike, whitelist and ban record.

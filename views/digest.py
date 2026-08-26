@@ -20,7 +20,7 @@ import time
 from collections import defaultdict
 from dataclasses import dataclass, field
 
-log = logging.getLogger("scamguard.digest")
+log = logging.getLogger("qalqon.digest")
 
 
 @dataclass
@@ -67,7 +67,7 @@ class DigestReporter:
         if not self._chats:
             return None
         hours = max((time.time() - self._since) / 3600.0, 0)
-        out = [f"📋 ScamGuard digest — last {hours:.1f}h"]
+        out = [f"📋 Qalqon digest — last {hours:.1f}h"]
         for entry in sorted(
             self._chats.values(), key=lambda c: -sum(c.counts.values())
         ):

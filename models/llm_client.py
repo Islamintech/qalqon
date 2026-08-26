@@ -30,7 +30,7 @@ from groq import AsyncGroq
 
 from .verdict import Verdict, Risk
 
-log = logging.getLogger("scamguard.llm")
+log = logging.getLogger("qalqon.llm")
 
 SYSTEM_PROMPT = """You are a moderation assistant for a Telegram group.
 Classify a single user message for scam / grooming / sexual-solicitation risk.

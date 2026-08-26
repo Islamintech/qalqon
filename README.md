@@ -1,4 +1,4 @@
-# ScamGuard — Telegram anti-scam moderation bot
+# Qalqon — Telegram anti-scam moderation bot
 
 Python + Groq + keyword/link/file detection, in a Model–View–Controller layout.
 
@@ -139,7 +139,7 @@ seconds so a repeat scammer is never rescanned.
 ```
 TELEGRAM_API_ID=            # from my.telegram.org
 TELEGRAM_API_HASH=
-MTPROTO_SESSION=scamguard_user
+MTPROTO_SESSION=qalqon_user
 MTPROTO_SCAN_LIMIT=40       # messages to check per channel
 MTPROTO_CACHE_TTL=21600     # 6h — don't rescan the same channel
 ```
@@ -288,7 +288,7 @@ open, each naming the bypass it closes.
 ### New env vars
 
 ```
-DB_PATH=scamguard.db
+DB_PATH=qalqon.db
 STRIKES_TO_ESCALATE=2      # strikes per escalation step
 TRUST_AFTER_MESSAGES=25    # clean messages before a member is "established"
 LLM_CACHE_TTL=900          # seconds to reuse a verdict for identical text
@@ -588,7 +588,7 @@ chat** — with twenty groups a flat timeline tells you nothing about *which*
 community has a problem:
 
 ```
-📋 ScamGuard digest — last 6.0h
+📋 Qalqon digest — last 6.0h
 
 "Crypto Signals" (-1001)
   6× BAN, 9× DELETE
@@ -622,14 +622,14 @@ distinguishable.
 
 So it says so on a schedule:
 
-- `✅ ScamGuard started` — once per start, so a crash-loop shows up as a stream
+- `✅ Qalqon started` — once per start, so a crash-loop shows up as a stream
   of these rather than as silence
-- `💚 ScamGuard still running` — every `HEARTBEAT_INTERVAL` (default 24h), with
+- `💚 Qalqon still running` — every `HEARTBEAT_INTERVAL` (default 24h), with
   what it has done since the last one. **Sent even when nothing happened** — the
   absence of this message is the alarm, so it cannot be conditional on there
   being something to report. (Contrast the digest, which stays silent on a quiet
   period: a digest reports on events, the heartbeat reports on the process.)
-- `⏹ ScamGuard stopping` — clean shutdown only, so an expected stop is
+- `⏹ Qalqon stopping` — clean shutdown only, so an expected stop is
   distinguishable from a crash
 
 A failing heartbeat send never propagates: the bot must not die because a

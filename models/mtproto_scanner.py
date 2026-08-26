@@ -18,7 +18,7 @@ import time
 from .verdict import Verdict, Risk
 from .file_scanner import FileScanner
 
-log = logging.getLogger("scamguard.mtproto")
+log = logging.getLogger("qalqon.mtproto")
 
 try:
     from telethon import TelegramClient
@@ -34,7 +34,7 @@ class MTProtoScanner:
         self,
         api_id: str,
         api_hash: str,
-        session: str = "scamguard_user",
+        session: str = "qalqon_user",
         scan_limit: int = 40,
         cache_ttl: int = 6 * 3600,
         file_scanner: FileScanner | None = None,

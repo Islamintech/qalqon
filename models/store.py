@@ -108,7 +108,7 @@ class UserRecord:
 
 
 class Store:
-    def __init__(self, path: str = "scamguard.db", decay_days: int = 30) -> None:
+    def __init__(self, path: str = "qalqon.db", decay_days: int = 30) -> None:
         self._path = path
         self._decay_days = max(int(decay_days), 0)
         self._lock = asyncio.Lock()
