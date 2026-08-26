@@ -91,7 +91,10 @@ async def test_lone_red_flag_deletes_but_does_not_ban(store, bot):
 
 async def test_borderline_only_alerts_admins(store, bot):
     controller, _ = build(store, FakeLLM(Risk.FIFTY_FIFTY), FakeProfiles(Risk.CLEAN), bot=bot)
-    await send(controller, bot, "dm me")
+    # Long enough to reach the model: "dm me" alone is now below the
+    # short-message threshold, because that phrase is how every currency
+    # exchange in these groups is arranged and no longer trips a keyword.
+    await send(controller, bot, "private message me about the offer")
     assert bot.deleted == [] and bot.banned == []
     assert len(bot.sent) == 1
     chat_id, text, markup = bot.sent[0]

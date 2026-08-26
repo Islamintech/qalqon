@@ -77,15 +77,34 @@ def test_worst_on_empty_does_not_crash():
     "text",
     [
         "hey check out my profile",
-        "DM me for details",
-        "earn $500 a day working from home",
         "guaranteed crypto profit here",
-        "is anyone free right now",
+        "kuniga 10% foyda kafolatlangan",
+        "Гарантированный доход 20% в день",
+        "oldindan 300$ to'lang",
+        "avval siz pul o'tkazing",
     ],
 )
 def test_keyword_catches_scam_openers(text):
     hit = KeywordFilter().check(text)
     assert hit is not None and hit.risk is Risk.FIFTY_FIFTY
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "DM me for details",
+        "earn 130000 won a day",
+        "is anyone free right now",
+        "contact me on telegram",
+    ],
+)
+def test_patterns_that_target_this_community_were_removed(text):
+    """These fired before and were wrong here: 'is anyone free' is a shift
+    request, a stated wage is a wage, and 'dm me' is how every currency
+    exchange in these groups is arranged. Whether such a message is a scam
+    depends on whether money is demanded up front — which a regex cannot see,
+    so it is left to the model."""
+    assert KeywordFilter().check(text) is None
 
 
 @pytest.mark.parametrize(
