@@ -1,10 +1,10 @@
 """Flags dangerous files. This is a DETECTOR, not anything that touches the
 file's contents — it decides on the declared name, type and size only.
 
-Two uses:
-  - files posted directly in the group (the bot sees these already), e.g. a
-    scammer dropping a fake 'wallet.apk'
-  - files found in a linked channel once fetched via MTProto (phase 2b)
+Given only a declared name, mime type and size — pulling those out of a
+Telegram message is the Controller's job, so this stays free of any knowledge
+about how a chat platform packages a file. Used both for files posted in a
+group and for files found inside a linked channel via MTProto.
 """
 from .verdict import Verdict, Risk
 
@@ -69,25 +69,3 @@ class FileScanner:
             reason=f"'{file_name}' — {detail}" if file_name else detail,
             source="file",
         )
-
-    def scan_attachment(self, msg) -> Verdict:
-        """Scan whatever file a Telegram message carries.
-
-        Documents are the obvious case, but a scammer can send the same payload
-        as an animation/video/audio and the old document-only handler let it
-        through. Telegram itself only guarantees the DECLARED name and mime, so
-        a missing name is not evidence of anything — we just have less to go on.
-        """
-        for attr in ("document", "animation", "video", "audio", "voice", "video_note"):
-            obj = getattr(msg, attr, None)
-            if obj is None:
-                continue
-            name = getattr(obj, "file_name", None) or ""
-            mime = getattr(obj, "mime_type", None)
-            size = getattr(obj, "file_size", None)
-            if not name and not mime:
-                continue
-            verdict = self.scan(name, mime, size)
-            if not verdict.clean:
-                return verdict
-        return Verdict(Risk.CLEAN, "no dangerous attachment", "file")

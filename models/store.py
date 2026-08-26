@@ -108,9 +108,13 @@ class UserRecord:
 
 
 class Store:
-    def __init__(self, path: str = "qalqon.db", decay_days: int = 30) -> None:
+    def __init__(
+        self, path: str = "qalqon.db", decay_days: int = 30,
+        event_retention_days: int = 90,
+    ) -> None:
         self._path = path
         self._decay_days = max(int(decay_days), 0)
+        self._retention_days = max(int(event_retention_days), 0)
         self._lock = asyncio.Lock()
         self._conn: sqlite3.Connection | None = None
         # Last title written per chat, so a rename is persisted but an
@@ -244,49 +248,6 @@ class Store:
             }
 
         return await self._run(_stats, chat_id, cutoff)
-
-    async def accuracy(self, chat_id: int | None = None) -> dict:
-        """How often a human overturned the bot.
-
-        The bot grading its own homework tells you nothing. An admin tapping
-        Ignore / Unban / Whitelist on an alert is a person saying the decision
-        was WRONG; tapping Ban is a person saying it was right. That is the only
-        unbiased signal of the false-positive rate available, which is what
-        decides whether the thresholds are safe to enforce with.
-
-        Reviewed cases are a biased sample — nobody clicks anything on the ones
-        that were obviously correct — so `overturn_rate` is an upper bound on
-        the false-positive rate, not a measurement of it. Treat it as
-        directional.
-        """
-
-        def _acc(conn, chat_id):
-            scope = "WHERE chat_id = ?" if chat_id is not None else "WHERE 1=1"
-            args: tuple = (chat_id,) if chat_id is not None else ()
-            row = conn.execute(
-                f"SELECT "
-                f"  SUM(risk = 'OVERTURNED') AS overturned, "
-                f"  SUM(risk = 'CONFIRMED')  AS confirmed "
-                f"FROM events {scope} AND action LIKE 'ADMIN_%'",
-                args,
-            ).fetchone()
-            overturned = row["overturned"] or 0
-            confirmed = row["confirmed"] or 0
-            reviewed = overturned + confirmed
-            acted = conn.execute(
-                f"SELECT COUNT(*) FROM events {scope} "
-                f"AND action IN ('REVIEW','DELETE','BAN')",
-                args,
-            ).fetchone()[0]
-            return {
-                "bot_actions": acted,
-                "reviewed": reviewed,
-                "overturned": overturned,
-                "confirmed": confirmed,
-                "overturn_rate": (overturned / reviewed) if reviewed else None,
-            }
-
-        return await self._run(_acc, chat_id)
 
     # --- writes ----------------------------------------------------------
     async def touch(self, chat_id: int, user_id: int, username: str = "") -> UserRecord:
@@ -435,6 +396,34 @@ class Store:
             conn.commit()
 
         await self._run(_clear, chat_id, user_id)
+
+    async def prune_events(self) -> int:
+        """Delete moderation records older than the retention window.
+
+        The events table holds up to 500 characters of real people's messages —
+        necessary to judge whether a flag was a false positive, but it is other
+        people's private conversation, and keeping it forever is a choice
+        nobody made deliberately. The audit value of a record decays quickly;
+        the privacy cost does not.
+
+        Aggregate counts in the dashboard shrink with it. That is the honest
+        trade: the alternative is a permanent archive of group chat.
+        Set retention to 0 to keep everything.
+        """
+        if not self._retention_days:
+            return 0
+        cutoff = time.time() - self._retention_days * DAY
+
+        def _prune(conn, cutoff):
+            cur = conn.execute("DELETE FROM events WHERE ts < ?", (cutoff,))
+            conn.commit()
+            return cur.rowcount
+
+        return await self._run(_prune, cutoff)
+
+    @property
+    def retention_days(self) -> int:
+        return self._retention_days
 
     async def prune_strikes(self) -> int:
         """Drop expired strike rows. add_strike does this opportunistically, but

@@ -191,3 +191,49 @@ async def test_migration_is_not_repeated_on_restart(tmp_path):
     await s2.start()
     assert (await s2.get(1, 42)).strikes == 2
     await s2.stop()
+
+
+# --- retention: moderation records do not live forever ---------------------
+async def test_old_moderation_records_are_deleted(tmp_path):
+    """The events table holds real people's message text. Keeping it forever is
+    a choice nobody made deliberately."""
+    s = Store(str(tmp_path / "r.db"), event_retention_days=90)
+    await s.start()
+    await s.log_event(1, 42, "BAN", "RED_FLAG", "recent", "a message")
+    # backdate one record past the window
+    def _old(conn):
+        conn.execute("UPDATE events SET ts = ? WHERE id = 1", (time.time() - 200 * DAY,))
+        conn.commit()
+    await s._run(lambda conn: _old(conn))
+    await s.log_event(1, 42, "DELETE", "RED_FLAG", "fresh", "another message")
+
+    assert await s.prune_events() == 1
+    left = await s.recent_events(1, 42, limit=10)
+    assert [e["reason"] for e in left] == ["fresh"]
+    await s.stop()
+
+
+async def test_retention_can_be_disabled(tmp_path):
+    s = Store(str(tmp_path / "keep.db"), event_retention_days=0)
+    await s.start()
+    await s.log_event(1, 42, "BAN", "RED_FLAG", "ancient", "x")
+    assert await s.prune_events() == 0, "0 means keep everything"
+    assert len(await s.recent_events(1, 42)) == 1
+    await s.stop()
+
+
+async def test_retention_keeps_the_user_record(tmp_path):
+    """Forgetting what someone SAID must not forget that they were sanctioned —
+    strikes and status are the moderation state, not the conversation."""
+    s = Store(str(tmp_path / "sep.db"), event_retention_days=90)
+    await s.start()
+    await s.add_strike(1, 42, n=2)
+    await s.log_event(1, 42, "BAN", "RED_FLAG", "old", "their words")
+    await s._run(lambda conn: (
+        conn.execute("UPDATE events SET ts = ?", (time.time() - 300 * DAY,)),
+        conn.commit(),
+    ))
+    await s.prune_events()
+    rec = await s.get(1, 42)
+    assert rec.strikes == 2 and rec.lifetime_strikes == 2
+    await s.stop()

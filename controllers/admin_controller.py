@@ -12,9 +12,7 @@ import time
 from telegram import Update
 from telegram.ext import ContextTypes
 
-from models.store import (
-    Store, STATUS_BANNED, STATUS_NORMAL, STATUS_WHITELISTED,
-)
+from models.store import Store, STATUS_NORMAL, STATUS_WHITELISTED
 from views import TelegramView
 from views.telegram_view import parse_callback, VERB_BAN, VERB_UNBAN
 

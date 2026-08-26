@@ -1,6 +1,6 @@
 """Central configuration. All secrets come from environment variables."""
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -109,6 +109,12 @@ class Settings:
     # widget requires one). Empty disables it — a default-on second credential
     # is how panels end up unintentionally reachable. Must be 32+ chars.
     web_access_token: str = os.getenv("WEB_ACCESS_TOKEN", "")
+
+    # How long a moderation record — including up to 500 characters of the
+    # message that triggered it — is kept. This is other people's private
+    # conversation; the audit value decays fast, the privacy cost does not.
+    # 0 keeps everything forever.
+    event_retention_days: int = int(os.getenv("EVENT_RETENTION_DAYS", "90"))
 
     # Safety switch. When True the bot only REPORTS what it would do and never
     # actually deletes or bans. Keep this on until you trust the detection.

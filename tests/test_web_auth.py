@@ -190,3 +190,33 @@ def test_empty_supplied_values_never_pass(supplied):
 def test_the_token_user_id_cannot_collide_with_a_real_one():
     """Telegram ids are positive, so a negative sentinel is unambiguous."""
     assert TOKEN_USER < 0
+
+
+# --- the privacy notice is public -------------------------------------------
+def test_privacy_page_needs_no_login():
+    """A privacy notice behind a sign-in is not a notice. Telegram links to it
+    from the bot's profile, where the reader has no account here."""
+    from fastapi.testclient import TestClient
+
+    from web.app import app
+
+    with TestClient(app) as client:
+        r = client.get("/privacy", follow_redirects=False)
+    assert r.status_code == 200
+    assert "Maxfiylik" in r.text
+
+
+def test_privacy_page_states_the_configured_retention():
+    """The figure is read from the live config, so the page cannot promise one
+    thing while the bot does another."""
+    from fastapi.testclient import TestClient
+
+    from config import settings
+    from web.app import app
+
+    with TestClient(app) as client:
+        body = client.get("/privacy").text
+    if settings.event_retention_days:
+        assert str(settings.event_retention_days) in body
+    else:
+        assert "muddatsiz" in body

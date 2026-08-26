@@ -45,17 +45,6 @@ def overview(conn, chat_id: int | None = None) -> dict:
     }
 
 
-def actions_by_type(conn, chat_id: int | None = None, days: int = 30) -> dict[str, int]:
-    where, args = _scope(chat_id)
-    since = time.time() - days * DAY
-    rows = conn.execute(
-        f"SELECT action, COUNT(*) c FROM events {where} AND ts >= ? "
-        f"AND action IN ('REVIEW','DELETE','BAN') GROUP BY action",
-        (*args, since),
-    ).fetchall()
-    return {r["action"]: r["c"] for r in rows}
-
-
 def daily_activity(conn, chat_id: int | None = None, days: int = 14) -> list[dict]:
     """One row per day, oldest first. Days with nothing are included as zeroes —
     a gap in a chart reads as missing data, not as a quiet day."""

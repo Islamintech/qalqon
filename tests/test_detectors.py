@@ -1,6 +1,7 @@
 """Keyword filter, file scanner, verdict combination, callback encoding."""
 import pytest
 
+from controllers.moderation_controller import MEDIA_FIELDS, attachment_of
 from models import FileScanner, KeywordFilter, Risk, Verdict
 from views.telegram_view import build_callback, parse_callback
 
@@ -163,23 +164,34 @@ class _Obj:
 
 class _Msg:
     def __init__(self, **kw):
-        for attr in ("document", "animation", "video", "audio", "voice", "video_note"):
+        for attr in MEDIA_FIELDS:
             setattr(self, attr, kw.get(attr))
 
 
-def test_scan_attachment_finds_a_payload_sent_as_video():
+# Extracting the attachment is Telegram-shaped knowledge, so it lives in the
+# controller; the scanner only judges a declared name/type/size. These tests
+# cover the pair together, because the bypass they guard against needs both.
+def test_a_payload_sent_as_video_is_still_found():
     """The document-only handler let this through."""
-    msg = _Msg(video=_Obj("wallet.apk", "video/mp4", 1000))
-    assert FileScanner().scan_attachment(msg).risk is Risk.RED_FLAG
+    att = attachment_of(_Msg(video=_Obj("wallet.apk", "video/mp4", 1000)))
+    assert FileScanner().scan(att.file_name, att.mime_type).risk is Risk.RED_FLAG
 
 
-def test_scan_attachment_clean_when_nothing_attached():
-    assert FileScanner().scan_attachment(_Msg()).risk is Risk.CLEAN
+def test_nothing_attached_yields_no_attachment():
+    assert attachment_of(_Msg()) is None
 
 
-def test_scan_attachment_ignores_a_normal_video():
-    msg = _Msg(video=_Obj("holiday.mp4", "video/mp4", 1000))
-    assert FileScanner().scan_attachment(msg).risk is Risk.CLEAN
+def test_a_normal_video_is_left_alone():
+    att = attachment_of(_Msg(video=_Obj("holiday.mp4", "video/mp4", 1000)))
+    assert FileScanner().scan(att.file_name, att.mime_type).risk is Risk.CLEAN
+
+
+def test_the_first_declared_attachment_wins():
+    """A message carries at most one of these in practice; the order must be
+    deterministic rather than dict-iteration luck."""
+    att = attachment_of(_Msg(document=_Obj("a.pdf", "application/pdf"),
+                             video=_Obj("b.mp4", "video/mp4")))
+    assert att.file_name == "a.pdf"
 
 
 # --- callback data ---------------------------------------------------------

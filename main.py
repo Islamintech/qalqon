@@ -83,7 +83,11 @@ def main() -> None:
     settings.validate()
 
     file_scanner = FileScanner()
-    store = Store(settings.db_path, decay_days=settings.strike_decay_days)
+    store = Store(
+        settings.db_path,
+        decay_days=settings.strike_decay_days,
+        event_retention_days=settings.event_retention_days,
+    )
 
     # Optional profile-photo NSFW screening (needs a free HF token).
     vision = (
@@ -171,6 +175,14 @@ def main() -> None:
         pruned = await store.prune_strikes()
         if pruned:
             logging.getLogger("qalqon").info("pruned %s expired strikes", pruned)
+        # Retention is enforced on every start, so a long-running deployment
+        # cannot quietly accumulate an archive of other people's messages.
+        forgotten = await store.prune_events()
+        if forgotten:
+            logging.getLogger("qalqon").info(
+                "deleted %s moderation records past the %s-day retention window",
+                forgotten, settings.event_retention_days,
+            )
         await mtproto.start()
 
         async def _send_digest(body: str) -> None:
