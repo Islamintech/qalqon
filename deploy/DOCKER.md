@@ -86,8 +86,21 @@ casual check.
 
 ## Backups
 
-```cron
-0 4 * * * cd /home/<user>/apps/qalqon && sqlite3 data/qalqon.db ".backup 'data/backup-$(date +\%F).db'" && find data -name 'backup-*.db' -mtime +14 -delete
+`deploy/backup.sh` takes a nightly snapshot. Install it with:
+
+```bash
+cp deploy/backup.sh ~/apps/qalqon/ && chmod +x ~/apps/qalqon/backup.sh
+( crontab -l 2>/dev/null; echo "0 4 * * * $HOME/apps/qalqon/backup.sh >> $HOME/apps/qalqon/backup.log 2>&1" ) | crontab -
+~/apps/qalqon/backup.sh          # run once to prove it works
 ```
 
-`.backup` is safe against a live database; `cp` while the bot writes is not.
+Three things it gets right that the obvious one-liner does not:
+
+- **sqlite3'''s .backup, not cp.** Copying the file while the bot is writing
+  can produce a torn snapshot.
+- **--user $(id -u).** A bind mount keeps the host'''s ownership, so the
+  image'''s own uid cannot write to ./data.
+- **It fails loudly.** The first version exited 0 when the backup had failed,
+  because its status came from the trailing `find`. A backup that reports
+  success without producing a file is worse than none, because you stop
+  checking. It now verifies the file is non-empty before pruning old ones.
