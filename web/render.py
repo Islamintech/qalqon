@@ -1,241 +1,334 @@
-"""Presentation layer for the dashboard: styles, chart, and page chrome.
+"""Design system for the dashboard: tokens, chrome, and chart rendering.
 
-Kept apart from app.py so routing and authentication stay readable next to
-each other, and so the visual language lives in one file.
+LIGHT BY DEFAULT, dark when the viewer's OS asks. Both are *selected* palettes
+validated against their own surface, not one flipped into the other:
 
-COLOR
-The three action series are a validated categorical palette, not a taste
-decision — checked with the data-viz validator against this dashboard's own
-dark surface (#171a21), all pairs:
+    role     light      dark
+    review   #2a78d6    #3987e5     blue
+    delete   #eda100    #c98500     amber
+    ban      #e34948    #d55181     red / rose
 
-    review  #3987e5  blue
-    delete  #c98500  amber
-    ban     #d55181  crimson
+Light passes every separation gate (CVD ΔE 15.3, normal-vision 20.8) with a
+contrast WARN on the amber, which the relief rule covers — the legend and the
+table view are both present, so colour never carries a value alone.
 
-    lightness band PASS · chroma floor PASS · CVD separation PASS
-    (deutan ΔE 13.2, tritan 8.7) · normal-vision ΔE 19.3 · contrast PASS
+Dark could not keep the same red: against the dark surface, amber and red land
+at normal-vision ΔE 13.0, below the 15 floor. The rose step is the nearest
+passing red. This is exactly why per-mode steps are chosen rather than one
+palette inverted into the other.
 
-Two semantically tidier options were rejected because they failed: the
-status trio (warning/serious/critical) puts amber beside orange at ΔE 13.6,
-below the 15 normal-vision floor; blue/amber/red fails the same pair at 13.0.
-Red and yellow cannot both appear in a three-series set at this size.
+Colour carries identity only; severity comes from the wording, the order and
+the icons.
 
-Colour carries identity only. Severity is carried by the legend order, the
-labels and the stack order — never by hue alone.
-
-DARK ONLY, deliberately. The product's surfaces are its identity and every
-value here was validated against them; a light mode would need its own
-validated steps rather than an inverted flip, and there is no use case for it
-(this is an operations console, read at night as often as not).
+PLAIN LANGUAGE. The first version showed BAN / DELETE / REVIEW, raw chat ids,
+and reason strings like "content=RED_FLAG(llm); profile=CLEAN". That reads as a
+database dump. An operator wants to know what happened to whom — "member
+removed", "message deleted" — with the machine detail available but out of the
+way.
 """
 
-# --- palette ---------------------------------------------------------------
-SURFACE = "#171a21"      # chart surface
-PLANE = "#0f1115"        # page plane
-RAISED = "#1c2029"
-INK = "#e9ecf2"          # primary
-INK_2 = "#a2a9b8"        # secondary
-INK_MUTED = "#6f7688"    # axis / labels
-HAIRLINE = "#242936"
-GRID = "#20242f"
+# --- tokens ----------------------------------------------------------------
+SERIES = {"REVIEW": "#2a78d6", "DELETE": "#eda100", "BAN": "#e34948"}
+SERIES_DARK = {"REVIEW": "#3987e5", "DELETE": "#c98500", "BAN": "#d55181"}
+SERIES_ORDER = ["BAN", "DELETE", "REVIEW"]
 
-SERIES = {
-    "REVIEW": "#3987e5",
-    "DELETE": "#c98500",
-    "BAN": "#d55181",
+# What each action is called in the interface, and its icon.
+LABEL = {
+    "BAN": ("Member removed", "🚫"),
+    "DELETE": ("Message deleted", "🧹"),
+    "REVIEW": ("Needs review", "⚠️"),
+    "ADMIN_BAN": ("You banned", "🚫"),
+    "ADMIN_UNBAN": ("You unbanned", "♻️"),
+    "ADMIN_IGNORE": ("You marked it a mistake", "👌"),
+    "ADMIN_WHITELIST": ("You trusted", "✅"),
 }
-SERIES_ORDER = ["BAN", "DELETE", "REVIEW"]  # most severe first, in legend
-ADMIN_TINT = "#9085e9"
-GOOD = "#0ca30c"
+PLURAL = {"BAN": "removed", "DELETE": "deleted", "REVIEW": "to review"}
 
-CSS = f"""
-*,*::before,*::after{{box-sizing:border-box}}
-:root{{color-scheme:dark}}
-body{{
-  margin:0;background:{PLANE};color:{INK};
+NAV = [
+    ("/", "Overview", "▦"),
+    ("/groups", "Groups", "◍"),
+    ("/members", "Members", "◎"),
+    ("/activity", "Activity", "◔"),
+]
+
+CSS = """
+*,*::before,*::after{box-sizing:border-box}
+:root{
+  color-scheme:light;
+  --page:#f6f7f9; --card:#ffffff; --raised:#f2f4f7;
+  --line:#e4e7ec; --line-soft:#eef1f4;
+  --ink:#101418; --ink-2:#4a5260; --muted:#79808f;
+  --accent:#2a78d6; --accent-soft:#eaf2fd; --accent-ink:#1b5fae;
+  --review:#2a78d6; --delete:#eda100; --ban:#e34948;
+  --review-bg:#eaf2fd; --delete-bg:#fdf3dd; --ban-bg:#fdecec;
+  --good:#0f8a3d; --good-bg:#e7f6ec;
+  --shadow:0 1px 2px rgba(16,20,24,.05),0 1px 3px rgba(16,20,24,.04);
+  --shadow-lg:0 2px 4px rgba(16,20,24,.05),0 8px 24px rgba(16,20,24,.07);
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    color-scheme:dark;
+    --page:#0f1115; --card:#171a21; --raised:#1c2029;
+    --line:#242936; --line-soft:#1e222c;
+    --ink:#e9ecf2; --ink-2:#a2a9b8; --muted:#767d8d;
+    --accent:#3987e5; --accent-soft:#17253b; --accent-ink:#8ab4ff;
+    --review:#3987e5; --delete:#c98500; --ban:#d55181;
+    --review-bg:#152435; --delete-bg:#2d2510; --ban-bg:#33202a;
+    --good:#3fbe6b; --good-bg:#152a1c;
+    --shadow:none; --shadow-lg:none;
+  }
+}
+body{margin:0;background:var(--page);color:var(--ink);
   font:15px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
-  -webkit-font-smoothing:antialiased;
-}}
-a{{color:#8ab4ff;text-decoration:none}}
-a:hover{{text-decoration:underline}}
+  -webkit-font-smoothing:antialiased}
+a{color:var(--accent-ink);text-decoration:none}
+a:hover{text-decoration:underline}
+h1,h2,h3{margin:0}
 
-/* ---------- chrome ---------- */
-header{{
-  position:sticky;top:0;z-index:5;background:rgba(15,17,21,.88);
-  backdrop-filter:blur(10px);border-bottom:1px solid {HAIRLINE};
-  padding:14px 22px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;
-}}
-.brand{{display:flex;align-items:center;gap:9px;font-weight:640;font-size:15px;
-  letter-spacing:-.01em}}
-.brand svg{{display:block}}
-.badge{{padding:3px 9px;border-radius:6px;font-size:11px;font-weight:650;
-  letter-spacing:.03em;text-transform:uppercase}}
-.badge.live{{background:#3a1c22;color:#f2a0ad;box-shadow:inset 0 0 0 1px #5b2a33}}
-.badge.dry{{background:#16281d;color:#84d9a4;box-shadow:inset 0 0 0 1px #23412f}}
-.spacer{{flex:1}}
-.who{{font-size:13px;color:{INK_2}}}
+/* ---------- shell ---------- */
+.shell{display:flex;min-height:100vh}
+aside{width:216px;flex:none;background:var(--card);
+  border-right:1px solid var(--line);padding:20px 14px;
+  display:flex;flex-direction:column;gap:22px}
+.brand{display:flex;align-items:center;gap:10px;padding:0 8px;
+  font-weight:660;font-size:16px;letter-spacing:-.01em}
+nav{display:flex;flex-direction:column;gap:2px}
+nav a{display:flex;align-items:center;gap:10px;padding:9px 11px;
+  border-radius:9px;color:var(--ink-2);font-size:14px;font-weight:520}
+nav a:hover{background:var(--raised);color:var(--ink);text-decoration:none}
+nav a[aria-current="page"]{background:var(--accent-soft);color:var(--accent-ink);
+  font-weight:620}
+nav a i{font-style:normal;opacity:.75;font-size:13px}
+.side-foot{margin-top:auto;padding:0 10px;font-size:12px;color:var(--muted);
+  line-height:1.7}
+main{flex:1;min-width:0;padding:26px 30px 60px;max-width:1160px}
 
-main{{padding:26px 22px 60px;max-width:1180px;margin:0 auto}}
-section{{margin-bottom:38px}}
-.head{{display:flex;align-items:baseline;gap:12px;margin:0 0 14px;flex-wrap:wrap}}
-h2{{font-size:12px;text-transform:uppercase;letter-spacing:.09em;
-  color:{INK_MUTED};margin:0;font-weight:660}}
-.sub{{font-size:12.5px;color:{INK_MUTED}}}
+/* ---------- page head ---------- */
+.phead{display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap;
+  margin-bottom:22px}
+.phead h1{font-size:22px;font-weight:660;letter-spacing:-.02em}
+.phead p{margin:3px 0 0;color:var(--muted);font-size:13.5px}
+.pill{padding:4px 10px;border-radius:999px;font-size:11.5px;font-weight:640;
+  letter-spacing:.02em;display:inline-block}
+.pill.dry{background:var(--good-bg);color:var(--good)}
+.pill.live{background:var(--ban-bg);color:var(--ban)}
+.grow{flex:1}
 
 /* ---------- filters ---------- */
-.filters{{display:flex;gap:18px;flex-wrap:wrap;align-items:center;
-  padding-bottom:20px;margin-bottom:24px;border-bottom:1px solid {HAIRLINE}}}
-.fgroup{{display:flex;align-items:center;gap:7px;flex-wrap:wrap}}
-.flabel{{font-size:11px;text-transform:uppercase;letter-spacing:.07em;
-  color:{INK_MUTED};font-weight:640}}
-.chip{{padding:5px 11px;border-radius:7px;font-size:12.5px;color:{INK_2};
-  background:{RAISED};box-shadow:inset 0 0 0 1px {HAIRLINE};white-space:nowrap}}
-.chip:hover{{color:{INK};text-decoration:none;background:#222736}}
-.chip[aria-current="true"]{{background:#25406e;color:#dce8ff;
-  box-shadow:inset 0 0 0 1px #35538a;font-weight:620}}
+.filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px}
+.chip{padding:6px 13px;border-radius:8px;font-size:13px;color:var(--ink-2);
+  background:var(--card);border:1px solid var(--line);white-space:nowrap}
+.chip:hover{text-decoration:none;border-color:var(--accent);color:var(--ink)}
+.chip[aria-current="true"]{background:var(--accent);border-color:var(--accent);
+  color:#fff;font-weight:600}
 
-/* ---------- tiles ---------- */
-.tiles{{display:grid;grid-template-columns:repeat(auto-fit,minmax(158px,1fr));
-  gap:12px}}
-.tile{{background:{SURFACE};border:1px solid {HAIRLINE};border-radius:12px;
-  padding:15px 17px}}
-.tile .v{{font-size:27px;font-weight:660;letter-spacing:-.025em;line-height:1.1}}
-.tile .k{{font-size:12px;color:{INK_MUTED};margin-top:3px}}
-.hero{{background:{SURFACE};border:1px solid {HAIRLINE};border-radius:14px;
-  padding:22px 24px;display:flex;align-items:baseline;gap:16px;flex-wrap:wrap}}
-.hero .v{{font-size:52px;font-weight:680;letter-spacing:-.04em;line-height:1}}
-.hero .k{{font-size:13.5px;color:{INK_2}}}
+/* ---------- cards & tiles ---------- */
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;
+  box-shadow:var(--shadow)}
+.pad{padding:20px 22px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(165px,1fr));
+  gap:14px;margin-bottom:26px}
+.tile{background:var(--card);border:1px solid var(--line);border-radius:14px;
+  padding:17px 19px;box-shadow:var(--shadow)}
+.tile .v{font-size:28px;font-weight:680;letter-spacing:-.03em;line-height:1.1}
+.tile .k{font-size:12.5px;color:var(--muted);margin-top:4px}
+.hero{display:flex;align-items:center;gap:22px;flex-wrap:wrap;
+  padding:24px 26px;margin-bottom:14px}
+.hero .v{font-size:54px;font-weight:700;letter-spacing:-.045em;line-height:1;
+  color:var(--accent-ink)}
+.hero .k{font-size:14px;color:var(--ink-2);line-height:1.5}
 
-/* ---------- chart ---------- */
-.card{{background:{SURFACE};border:1px solid {HAIRLINE};border-radius:14px;
-  padding:18px 20px 14px}}
-.legend{{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:14px}}
-.lg{{display:flex;align-items:center;gap:7px;font-size:12.5px;color:{INK_2}}}
-.sw{{width:10px;height:10px;border-radius:3px;flex:none}}
-.chart{{width:100%;height:auto;display:block;overflow:visible}}
-.chart text{{font:11px system-ui,-apple-system,"Segoe UI",sans-serif;
-  fill:{INK_MUTED};font-variant-numeric:tabular-nums}}
-.chart .seg:hover{{opacity:.82}}
+/* ---------- action chips ---------- */
+.act{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;
+  border-radius:7px;font-size:12px;font-weight:620;white-space:nowrap}
+.act.BAN,.act.ADMIN_BAN{background:var(--ban-bg);color:var(--ban)}
+.act.DELETE{background:var(--delete-bg);color:var(--delete)}
+.act.REVIEW{background:var(--review-bg);color:var(--review)}
+.act.ADMIN_IGNORE,.act.ADMIN_UNBAN,.act.ADMIN_WHITELIST{
+  background:var(--raised);color:var(--ink-2)}
 
 /* ---------- group cards ---------- */
-.gcards{{display:grid;grid-template-columns:repeat(auto-fill,minmax(258px,1fr));
-  gap:12px}}
-.gcard{{background:{SURFACE};border:1px solid {HAIRLINE};border-radius:12px;
-  padding:15px 17px;display:block;color:inherit}}
-.gcard:hover{{text-decoration:none;border-color:#33405c;background:#1a1e28}}
-.gname{{font-size:15px;font-weight:640;letter-spacing:-.01em;margin-bottom:2px}}
-.gid{{font-size:11px;margin-bottom:12px}}
-.gstats{{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:11px}}
-.gstat{{font-size:11.5px;color:{INK_MUTED};display:flex;align-items:baseline;
-  gap:5px}}
-.gstat b{{font-size:21px;font-weight:660;letter-spacing:-.02em}}
-.gfoot{{font-size:11.5px;color:{INK_2}}}
-.gfoot.dim{{color:{INK_MUTED};margin-top:2px}}
-.back{{font-size:12.5px;color:{INK_MUTED};display:inline-block;margin-bottom:10px}}
+.gcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(272px,1fr));
+  gap:14px}
+.gcard{display:block;background:var(--card);border:1px solid var(--line);
+  border-radius:14px;padding:18px 20px;color:inherit;box-shadow:var(--shadow)}
+.gcard:hover{text-decoration:none;border-color:var(--accent);
+  box-shadow:var(--shadow-lg)}
+.gname{font-size:16px;font-weight:640;letter-spacing:-.01em}
+.gsub{font-size:12px;color:var(--muted);margin-top:2px}
+.gnums{display:flex;gap:20px;margin:15px 0 12px}
+.gnum b{display:block;font-size:23px;font-weight:680;letter-spacing:-.02em;
+  line-height:1.15}
+.gnum span{font-size:11.5px;color:var(--muted)}
+.gfoot{font-size:12px;color:var(--ink-2);border-top:1px solid var(--line-soft);
+  padding-top:11px}
+
+/* ---------- feed ---------- */
+.feed{display:flex;flex-direction:column}
+.item{display:flex;gap:14px;padding:16px 22px;
+  border-bottom:1px solid var(--line-soft)}
+.item:last-child{border-bottom:0}
+.item .who{font-weight:600;font-size:14px}
+.item .meta{font-size:12px;color:var(--muted);margin-top:3px}
+.item .said{font-size:13.5px;color:var(--ink-2);margin-top:9px;
+  background:var(--raised);border-radius:9px;padding:9px 12px;
+  overflow-wrap:anywhere;border-left:2px solid var(--line)}
+.item .when{margin-left:auto;font-size:12px;color:var(--muted);
+  white-space:nowrap;padding-left:10px}
 
 /* ---------- tables ---------- */
-.wrap{{overflow-x:auto;border:1px solid {HAIRLINE};border-radius:12px;
-  background:{SURFACE}}}
-table{{width:100%;border-collapse:collapse;font-size:13px}}
-th{{text-align:left;color:{INK_MUTED};font-weight:640;padding:11px 14px;
-  border-bottom:1px solid {HAIRLINE};font-size:11px;text-transform:uppercase;
-  letter-spacing:.06em;white-space:nowrap}}
-td{{padding:10px 14px;border-bottom:1px solid {GRID};vertical-align:top}}
-tr:last-child td{{border-bottom:0}}
-tbody tr:hover td{{background:#1b1f29}}
-.num{{font-variant-numeric:tabular-nums}}
-.tag{{padding:2px 8px;border-radius:5px;font-size:11px;font-weight:650;
-  white-space:nowrap;display:inline-block;letter-spacing:.02em}}
-.mono{{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px;
-  color:{INK_MUTED}}}
-.msg{{color:{INK_2};font-size:12.5px;max-width:400px;overflow-wrap:anywhere}}
-.dim{{color:{INK_MUTED}}}
+.wrap{overflow-x:auto;border-radius:14px}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th{text-align:left;color:var(--muted);font-weight:620;padding:12px 18px;
+  border-bottom:1px solid var(--line);font-size:11.5px;text-transform:uppercase;
+  letter-spacing:.05em;white-space:nowrap}
+td{padding:13px 18px;border-bottom:1px solid var(--line-soft)}
+tr:last-child td{border-bottom:0}
+tbody tr:hover td{background:var(--raised)}
+.num{font-variant-numeric:tabular-nums}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;
+  color:var(--muted)}
+.dim{color:var(--muted)}
 
-/* ---------- notes & empties ---------- */
-.note{{background:#1b1a16;border-left:3px solid #8a6a1e;padding:11px 15px;
-  border-radius:0 9px 9px 0;font-size:12.5px;color:#cfc6ae;margin-top:12px}}
-.empty{{padding:36px 20px;text-align:center;color:{INK_MUTED};font-size:13.5px}}
-details{{margin-top:12px}}
-summary{{cursor:pointer;font-size:12px;color:{INK_MUTED};
-  list-style:none;display:inline-flex;align-items:center;gap:6px}}
-summary::-webkit-details-marker{{display:none}}
-summary:hover{{color:{INK_2}}}
+/* ---------- chart ---------- */
+.legend{display:flex;gap:18px;flex-wrap:wrap;margin-bottom:16px}
+.lg{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--ink-2)}
+.sw{width:11px;height:11px;border-radius:3px;flex:none}
+.chart{width:100%;height:auto;display:block}
+.chart text{font:11px system-ui,-apple-system,sans-serif;fill:var(--muted);
+  font-variant-numeric:tabular-nums}
+.chart .seg:hover{opacity:.8}
+
+/* ---------- empty states ---------- */
+.empty{padding:54px 28px;text-align:center}
+.empty .icon{font-size:30px;opacity:.5}
+.empty h3{font-size:16px;font-weight:620;margin:14px 0 6px}
+.empty p{margin:0 auto;max-width:430px;color:var(--muted);font-size:13.5px;
+  line-height:1.6}
+.empty .hint{margin-top:18px;display:inline-block;text-align:left;
+  background:var(--raised);border-radius:10px;padding:13px 17px;
+  font-size:13px;color:var(--ink-2);line-height:1.8}
+
+.note{background:var(--delete-bg);border-radius:11px;padding:13px 17px;
+  font-size:13px;color:var(--ink-2);line-height:1.55;margin-top:14px}
+details{margin-top:10px}
+summary{cursor:pointer;font-size:12.5px;color:var(--muted);list-style:none}
+summary::-webkit-details-marker{display:none}
+summary:hover{color:var(--ink-2)}
 
 /* ---------- login ---------- */
-.login{{max-width:390px;margin:12vh auto;text-align:center;padding:0 20px}}
-.login h2{{font-size:19px;text-transform:none;letter-spacing:-.01em;
-  color:{INK};margin-bottom:8px}}
-.login p{{color:{INK_MUTED};font-size:13.5px;margin-top:0}}
-.field{{width:100%;padding:11px 13px;border-radius:9px;
-  border:1px solid {HAIRLINE};background:{SURFACE};color:{INK};font-size:14px}}
-.field:focus{{outline:2px solid #35538a;outline-offset:1px}}
-.btn{{margin-top:10px;width:100%;padding:11px;border-radius:9px;border:0;
-  background:#2f5399;color:#fff;font-size:14px;font-weight:640;cursor:pointer}}
-.btn:hover{{background:#37609f}}
-code{{background:{RAISED};padding:2px 6px;border-radius:5px;font-size:12px}}
+.login{max-width:400px;margin:13vh auto;text-align:center;padding:0 20px}
+.login .card{padding:32px 28px}
+.login h1{font-size:21px;margin-bottom:6px}
+.login p{color:var(--muted);font-size:13.5px;margin:0 0 20px}
+.field{width:100%;padding:11px 13px;border-radius:10px;
+  border:1px solid var(--line);background:var(--page);color:var(--ink);
+  font-size:14px}
+.field:focus{outline:2px solid var(--accent);outline-offset:1px}
+.btn{margin-top:10px;width:100%;padding:11px;border-radius:10px;border:0;
+  background:var(--accent);color:#fff;font-size:14px;font-weight:620;
+  cursor:pointer}
+code{background:var(--raised);padding:2px 6px;border-radius:5px;font-size:12.5px}
 
-@media (max-width:640px){{
-  main{{padding:20px 14px 48px}}
-  header{{padding:12px 14px;gap:10px}}
-  .hero .v{{font-size:40px}}
-  .tile .v{{font-size:23px}}
-  .msg{{max-width:200px}}
-}}
+@media (max-width:820px){
+  .shell{flex-direction:column}
+  aside{width:auto;border-right:0;border-bottom:1px solid var(--line);
+    flex-direction:row;align-items:center;gap:14px;padding:12px 16px;
+    overflow-x:auto}
+  nav{flex-direction:row;gap:4px}
+  nav a span{display:none}
+  nav a{padding:8px 12px}
+  .side-foot{display:none}
+  main{padding:20px 16px 48px}
+  .hero .v{font-size:42px}
+}
 """
 
 LOGO = (
-    '<svg width="20" height="22" viewBox="0 0 20 22" fill="none" '
+    '<svg width="21" height="23" viewBox="0 0 20 22" fill="none" '
     'aria-hidden="true"><path d="M10 1 18.2 4v7.1c0 4.6-3.3 8.2-8.2 9.9'
-    '-4.9-1.7-8.2-5.3-8.2-9.9V4L10 1Z" fill="#3987e5"/>'
-    '<path d="m6.4 10.9 2.5 2.5 4.9-4.9" stroke="#0f1115" stroke-width="2.1" '
-    'stroke-linecap="round" stroke-linejoin="round"/></svg>'
+    '-4.9-1.7-8.2-5.3-8.2-9.9V4L10 1Z" fill="currentColor"/>'
+    '<path d="m6.4 10.9 2.5 2.5 4.9-4.9" stroke="var(--card)" '
+    'stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>'
 )
 
 
-def bar_chart(daily: list[dict], height: int = 190) -> str:
+def sidebar(active: str, dry_run: bool, user_label: str) -> str:
+    links = "".join(
+        f'<a href="{href}" aria-current="{"page" if href == active else "false"}">'
+        f"<i>{icon}</i><span>{name}</span></a>"
+        for href, name, icon in NAV
+    )
+    mode = (
+        '<span class="pill dry">Dry run</span>' if dry_run
+        else '<span class="pill live">Live</span>'
+    )
+    return (
+        f'<aside><div class="brand" style="color:var(--accent)">{LOGO}'
+        f'<span style="color:var(--ink)">Qalqon</span></div>'
+        f"<nav>{links}</nav>"
+        f'<div class="side-foot">{mode}<br>{user_label}<br>'
+        f'<a href="/privacy">Maxfiylik</a> &middot; <a href="/logout">Chiqish</a>'
+        f"</div></aside>"
+    )
+
+
+def empty(icon: str, title: str, body: str, hint: str = "") -> str:
+    """An empty state should say what to DO, not just that there is nothing.
+
+    With three events the old page looked broken rather than quiet, and gave a
+    reader no way to tell "working, nothing to report" from "misconfigured".
+    """
+    hint_html = f'<div class="hint">{hint}</div>' if hint else ""
+    return (
+        f'<div class="card"><div class="empty"><div class="icon">{icon}</div>'
+        f"<h3>{title}</h3><p>{body}</p>{hint_html}</div></div>"
+    )
+
+
+def legend(keys=None) -> str:
+    keys = keys or SERIES_ORDER
+    items = "".join(
+        f'<span class="lg"><span class="sw" style="background:var(--{k.lower()})">'
+        f"</span>{LABEL[k][0]}</span>"
+        for k in keys
+    )
+    return f'<div class="legend">{items}</div>'
+
+
+def bar_chart(daily: list[dict], height: int = 210) -> str:
     """Stacked daily activity.
 
-    Mark specs from the data-viz method: 2px surface gap between stacked
-    segments (never a border around marks), 4px rounded data-end on the top
-    segment only, hairline recessive grid, no value printed on every bar.
-    Each segment carries a <title> so the exact number is reachable on hover
-    without JavaScript, and a table view sits below for the WCAG-clean path.
+    2px surface gap between stacked segments rather than a border, rounded
+    data-end on the top segment only, solid hairline grid, no value printed on
+    every bar. Each segment carries a <title> so the exact number is reachable
+    on hover without JavaScript; the table view below is the WCAG-clean twin.
     """
     n = len(daily)
     if not n:
-        return '<div class="empty">No activity recorded yet.</div>'
+        return ""
 
     totals = [d["REVIEW"] + d["DELETE"] + d["BAN"] for d in daily]
     peak = max(totals) or 1
-    # Round the axis up to something readable rather than to the raw peak.
     step = 1 if peak <= 4 else (2 if peak <= 10 else 5 if peak <= 25 else 10)
     top = ((peak + step - 1) // step) * step
 
-    pad_l, pad_r, pad_t, pad_b = 30, 4, 8, 22
-    w = 720
-    plot_w = w - pad_l - pad_r
-    plot_h = height - pad_t - pad_b
+    pad_l, pad_r, pad_t, pad_b = 34, 6, 10, 26
+    w = 760
+    plot_w, plot_h = w - pad_l - pad_r, height - pad_t - pad_b
     band = plot_w / n
-    bar_w = min(band * 0.62, 26)
+    bar_w = min(band * 0.6, 30)
 
     out = [
-        f'<svg class="chart" viewBox="0 0 {w} {height}" '
-        # Default (uniform) aspect ratio: preserveAspectRatio="none" would
-        # stretch the axis text horizontally when the card is wide.
-        f'role="img" '
+        f'<svg class="chart" viewBox="0 0 {w} {height}" role="img" '
         f'aria-label="Moderation actions per day">'
     ]
-
-    # Recessive solid hairline grid — never dashed.
-    ticks = [0, top // 2, top] if top >= 2 else [0, top]
-    for t in sorted(set(ticks)):
+    for t in sorted({0, top // 2, top}):
         y = pad_t + plot_h - (t / top) * plot_h
         out.append(
             f'<line x1="{pad_l}" y1="{y:.1f}" x2="{w - pad_r}" y2="{y:.1f}" '
-            f'stroke="{GRID}" stroke-width="1"/>'
-        )
-        out.append(
-            f'<text x="{pad_l - 8}" y="{y + 3.5:.1f}" text-anchor="end">{t}</text>'
+            f'stroke="var(--line-soft)" stroke-width="1"/>'
+            f'<text x="{pad_l - 9}" y="{y + 3.5:.1f}" text-anchor="end">{t}</text>'
         )
 
     for i, d in enumerate(daily):
@@ -244,29 +337,25 @@ def bar_chart(daily: list[dict], height: int = 190) -> str:
         stack = [(k, d[k]) for k in ("REVIEW", "DELETE", "BAN") if d[k]]
         for j, (key, value) in enumerate(stack):
             h = (value / top) * plot_h
-            # 2px surface gap between segments, not a stroke.
             gap = 2 if j < len(stack) - 1 else 0
-            seg_h = max(h - gap, 1.5)
             y -= h
-            topmost = j == len(stack) - 1
-            radius = 'rx="3"' if topmost else ""
+            radius = 'rx="4"' if j == len(stack) - 1 else ""
             out.append(
                 f'<rect class="seg" x="{x:.1f}" y="{y + gap:.1f}" '
-                f'width="{bar_w:.1f}" height="{seg_h:.1f}" {radius} '
-                f'fill="{SERIES[key]}"><title>{d["day"]} — {value} '
-                f'{key.lower()}</title></rect>'
+                f'width="{bar_w:.1f}" height="{max(h - gap, 2):.1f}" {radius} '
+                f'fill="var(--{key.lower()})"><title>{d["day"]}: {value} '
+                f"{PLURAL[key]}</title></rect>"
             )
         if not stack:
-            # A flat tick so an empty day reads as "zero", not "missing".
+            # A flat tick, so an empty day reads as zero rather than missing.
             out.append(
-                f'<rect x="{x:.1f}" y="{pad_t + plot_h - 1.5:.1f}" '
-                f'width="{bar_w:.1f}" height="1.5" fill="{HAIRLINE}"/>'
+                f'<rect x="{x:.1f}" y="{pad_t + plot_h - 2:.1f}" '
+                f'width="{bar_w:.1f}" height="2" rx="1" fill="var(--line)"/>'
             )
 
-    # Axis baseline, and labels only where they will not collide.
     out.append(
         f'<line x1="{pad_l}" y1="{pad_t + plot_h}" x2="{w - pad_r}" '
-        f'y2="{pad_t + plot_h}" stroke="{HAIRLINE}" stroke-width="1"/>'
+        f'y2="{pad_t + plot_h}" stroke="var(--line)" stroke-width="1"/>'
     )
     every = 1 if n <= 8 else (2 if n <= 16 else 5)
     for i, d in enumerate(daily):
@@ -274,62 +363,8 @@ def bar_chart(daily: list[dict], height: int = 190) -> str:
             continue
         cx = pad_l + i * band + band / 2
         out.append(
-            f'<text x="{cx:.1f}" y="{height - 6}" text-anchor="middle">'
+            f'<text x="{cx:.1f}" y="{height - 8}" text-anchor="middle">'
             f'{d["day"][5:]}</text>'
         )
     out.append("</svg>")
     return "".join(out)
-
-
-def group_cards(chats: list[dict], href, escape, ago) -> str:
-    """One card per group: its NAME first, then what the bot has actually done
-    there.
-
-    A table of chat ids answered "how many" but never "which one" — the whole
-    point of watching several groups is knowing which is having trouble. The
-    two numbers that matter are given the most room: messages removed, and
-    members banned.
-    """
-    if not chats:
-        return (
-            '<div class="wrap"><div class="empty">No groups yet. Add the bot '
-            'to a group and post a message.</div></div>'
-        )
-
-    cards = []
-    for c in chats:
-        name = escape(c["title"]) if c["title"] else "Unnamed group"
-        unnamed = "" if c["title"] else (
-            ' <span class="dim" style="font-size:11px">'
-            '(name appears after its next message)</span>'
-        )
-        quiet = (c["bans"] + c["deletes"] + c["reviews"]) == 0
-        cards.append(
-            f'<a class="gcard" href="{href(c["chat_id"])}">'
-            f'<div class="gname">{name}{unnamed}</div>'
-            f'<div class="gid mono">{c["chat_id"]}</div>'
-            f'<div class="gstats">'
-            f'<span class="gstat"><b style="color:{SERIES["DELETE"]}">'
-            f'{c["deletes"]}</b> deleted</span>'
-            f'<span class="gstat"><b style="color:{SERIES["BAN"]}">'
-            f'{c["bans"]}</b> banned</span>'
-            f'<span class="gstat"><b style="color:{SERIES["REVIEW"]}">'
-            f'{c["reviews"]}</b> to review</span>'
-            f'</div>'
-            f'<div class="gfoot">{c["members"]} members · {c["messages"]} '
-            f'messages seen · {c["banned_now"]} currently banned</div>'
-            f'<div class="gfoot dim">'
-            f'{"no incidents yet" if quiet else "last action " + ago(c["last_action"])}'
-            f'</div></a>'
-        )
-    return f'<div class="gcards">{"".join(cards)}</div>'
-
-
-def legend(keys=None) -> str:
-    keys = keys or SERIES_ORDER
-    items = "".join(
-        f'<span class="lg"><span class="sw" style="background:{SERIES[k]}">'
-        f'</span>{k.title()}</span>'
-        for k in keys
-    )
-    return f'<div class="legend">{items}</div>'
