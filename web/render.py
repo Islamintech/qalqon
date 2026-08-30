@@ -45,7 +45,7 @@ LABEL = {
 PLURAL = {"BAN": "removed", "DELETE": "deleted", "REVIEW": "to review"}
 
 NAV = [
-    ("/", "Overview", "▦"),
+    ("/app", "Overview", "▦"),
     ("/groups", "Groups", "◍"),
     ("/members", "Members", "◎"),
     ("/activity", "Activity", "◔"),
@@ -269,7 +269,8 @@ def sidebar(active: str, dry_run: bool, user_label: str) -> str:
         f'<span style="color:var(--ink)">Qalqon</span></div>'
         f"<nav>{links}</nav>"
         f'<div class="side-foot">{mode}<br>{user_label}<br>'
-        f'<a href="/privacy">Maxfiylik</a> &middot; <a href="/logout">Chiqish</a>'
+        f'<a href="/">Site</a> &middot; <a href="/privacy">Privacy</a>'
+        f' &middot; <a href="/logout">Sign out</a>'
         f"</div></aside>"
     )
 

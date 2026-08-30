@@ -28,7 +28,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from config import settings  # noqa: E402
-from web import pages, pricing, queries, render  # noqa: E402
+from web import landing, pages, pricing, queries, render  # noqa: E402
 from web.auth import (  # noqa: E402
     TOKEN_USER, is_allowed, issue_session, read_session, session_secret,
     verify_access_token, verify_telegram_login,
@@ -94,20 +94,35 @@ def page(body: str, user_id: int | None = None) -> HTMLResponse:
     return _document(body)
 
 
-def _document(inner: str) -> HTMLResponse:
+def _document(inner: str, extra_css: str = "", public: bool = False) -> HTMLResponse:
+    # The landing page is the only thing meant to be found; every other page
+    # renders private group data and stays out of search results.
+    robots = (
+        "index,follow" if public
+        else "noindex,nofollow"
+    )
+    desc = (
+        "Qalqon is an anti-scam moderation bot for Telegram communities. It "
+        "detects fraud in Uzbek, Russian and English, removes clear attacks, "
+        "and asks a human about the rest."
+    )
     return HTMLResponse(
         "<!doctype html><html lang=en><head><meta charset=utf-8>"
         "<meta name=viewport content='width=device-width,initial-scale=1'>"
-        "<meta name=robots content='noindex,nofollow'>"
-        "<title>Qalqon</title>"
-        f"<style>{render.CSS}</style></head><body>{inner}</body></html>"
+        f"<meta name=robots content='{robots}'>"
+        f'<meta name="description" content="{desc}">'
+        '<meta property="og:title" content="Qalqon — anti-scam moderation for Telegram">'
+        f'<meta property="og:description" content="{desc}">'
+        '<meta property="og:type" content="website">'
+        "<title>Qalqon — anti-scam moderation for Telegram</title>"
+        f"<style>{render.CSS}{extra_css}</style></head><body>{inner}</body></html>"
     )
 
 
 @app.get("/login", response_class=HTMLResponse)
 async def login(request: Request):
     if _current_user(request):
-        return RedirectResponse("/", status_code=303)
+        return RedirectResponse("/app", status_code=303)
     blocks = []
     if settings.web_bot_username:
         blocks.append(
@@ -146,7 +161,7 @@ async def auth_token(request: Request):
         return page("<main class=login><div class=card><h1>Sign-in failed</h1>"
                     "<p>That token is not valid. "
                     "<a href='/login'>Try again</a>.</p></div></main>")
-    response = RedirectResponse("/", status_code=303)
+    response = RedirectResponse("/app", status_code=303)
     response.set_cookie(
         COOKIE, issue_session(TOKEN_USER, SECRET),
         httponly=True, samesite="lax",
@@ -174,7 +189,7 @@ async def auth_telegram(request: Request):
             f"user <code>{user_id}</code> is not on the allow-list. Add it to "
             f"<code>WEB_ADMIN_IDS</code> and restart the panel.</p></div></main>"
         )
-    response = RedirectResponse("/", status_code=303)
+    response = RedirectResponse("/app", status_code=303)
     response.set_cookie(
         COOKIE, issue_session(user_id, SECRET),
         httponly=True, samesite="lax",
@@ -254,11 +269,21 @@ def _db_error(user_id, exc) -> HTMLResponse:
             f"{pages.e(exc)} — expected at {pages.e(settings.db_path)}. "
             "The dashboard opens it read-only, so the bot must have created "
             "it first.",
-        ), user_id, "/",
+        ), user_id, "/app",
     )
 
 
 @app.get("/", response_class=HTMLResponse)
+async def home(request: Request):
+    """Public. The URL people are given, so it explains the project rather
+    than bouncing a stranger to a login box."""
+    return _document(
+        landing.page(render.LOGO, signed_in=bool(_current_user(request))),
+        extra_css=landing.CSS, public=True,
+    )
+
+
+@app.get("/app", response_class=HTMLResponse)
 async def overview(request: Request):
     user_id, redirect = _guard(request)
     if redirect:
@@ -267,7 +292,7 @@ async def overview(request: Request):
         data = _load(request)
     except Exception as exc:
         return _db_error(user_id, exc)
-    return shell(pages.overview(data), user_id, "/")
+    return shell(pages.overview(data), user_id, "/app")
 
 
 @app.get("/groups", response_class=HTMLResponse)

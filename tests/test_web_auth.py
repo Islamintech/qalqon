@@ -220,3 +220,44 @@ def test_privacy_page_states_the_configured_retention():
         assert str(settings.event_retention_days) in body
     else:
         assert "muddatsiz" in body
+
+
+# --- the public landing page ------------------------------------------------
+def test_the_landing_page_is_public_and_indexable():
+    """It is the URL people are given, so a stranger must not be bounced to a
+    login box — and unlike every other page it carries no private data, so it
+    is the only one allowed into search results."""
+    from fastapi.testclient import TestClient
+
+    from web.app import app
+
+    with TestClient(app) as client:
+        r = client.get("/", follow_redirects=False)
+    assert r.status_code == 200
+    assert "index,follow" in r.text
+    assert "Qalqon" in r.text
+
+
+def test_the_dashboard_is_still_behind_the_login():
+    from fastapi.testclient import TestClient
+
+    from web.app import app
+
+    with TestClient(app) as client:
+        for path in ("/app", "/groups", "/members", "/activity", "/usage"):
+            r = client.get(path, follow_redirects=False)
+            assert r.status_code == 303, path
+            assert r.headers["location"] == "/login"
+
+
+def test_the_landing_page_leaks_no_group_data():
+    """Group names, member ids and message text belong to the communities
+    being moderated. A portfolio page is the last place they should appear."""
+    from fastapi.testclient import TestClient
+
+    from web.app import app
+
+    with TestClient(app) as client:
+        body = client.get("/").text
+    for leak in ("-100", "@islamun", "@vivora", "chat_id"):
+        assert leak not in body, f"landing page leaked {leak}"
