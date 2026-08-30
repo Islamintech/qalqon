@@ -12,115 +12,134 @@ conversation.
 """
 
 CSS = """
-.lp{--max:1080px}
+.lp{--max:1100px}
 .lp a{text-decoration:none}
 
-/* header */
+/* ---------- header: three zones, so the nav is centred in the bar rather
+   than crowding the logo and leaving the right half empty ---------- */
 .lp-head{position:sticky;top:0;z-index:20;backdrop-filter:saturate(180%) blur(14px);
-  background:color-mix(in srgb, var(--page) 78%, transparent);
+  background:color-mix(in srgb, var(--page) 80%, transparent);
   border-bottom:1px solid var(--line)}
-.lp-head .in{max-width:var(--max);margin:0 auto;padding:0 24px;height:64px;
-  display:flex;align-items:center;gap:8px}
+.lp-head .in{max-width:var(--max);margin:0 auto;padding:0 28px;height:66px;
+  display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:16px}
 .lp-brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:18px;
-  letter-spacing:-.025em;color:var(--ink);margin-right:14px}
-.lp-brand svg{width:22px;height:24px}
-.lp-nav{display:flex;gap:2px;align-items:center}
-.lp-nav a{color:var(--ink-2);font-size:14px;font-weight:540;padding:8px 13px;
-  border-radius:8px;line-height:1}
+  letter-spacing:-.025em;color:var(--ink);justify-self:start}
+.lp-brand svg{width:22px;height:24px;flex:none}
+.lp-nav{display:flex;gap:4px;align-items:center;justify-self:center}
+.lp-nav a{color:var(--ink-2);font-size:14px;font-weight:540;padding:8px 14px;
+  border-radius:8px;line-height:1;white-space:nowrap}
 .lp-nav a:hover{color:var(--ink);background:var(--raised)}
-.lp-cta{margin-left:auto;display:flex;gap:10px;align-items:center}
+.lp-cta{justify-self:end;display:flex;gap:10px;align-items:center}
 .lp-btn{padding:10px 18px;border-radius:10px;font-size:14px;font-weight:620;
   background:var(--accent);color:#fff;white-space:nowrap;line-height:1;
-  box-shadow:0 1px 2px rgba(16,20,24,.10)}
+  box-shadow:0 1px 2px rgba(16,20,24,.12)}
 .lp-btn:hover{filter:brightness(1.07)}
-.lp-btn.ghost{background:transparent;color:var(--ink-2);box-shadow:none;
+.lp-btn.ghost{background:transparent;color:var(--ink-2);
   box-shadow:inset 0 0 0 1px var(--line)}
 .lp-btn.ghost:hover{color:var(--ink);box-shadow:inset 0 0 0 1px var(--accent)}
 
-/* sections */
-.lp section{max-width:var(--max);margin:0 auto;padding:84px 24px}
-.lp h2{font-size:30px;font-weight:680;letter-spacing:-.028em;margin-bottom:12px}
-.lp .lead{color:var(--ink-2);font-size:16px;max-width:620px;line-height:1.65}
-.eyebrow{font-size:12px;font-weight:680;letter-spacing:.1em;
-  text-transform:uppercase;color:var(--accent);margin-bottom:12px}
+/* ---------- sections: one centred column, so no section is left-packed
+   with dead space beside it ---------- */
+.lp section{max-width:var(--max);margin:0 auto;padding:90px 28px}
+.sec-head{max-width:660px;margin:0 auto 40px;text-align:center}
+.lp h2{font-size:clamp(25px,3.2vw,33px);font-weight:690;letter-spacing:-.03em;
+  margin-bottom:14px;line-height:1.15}
+.lp .lead{color:var(--ink-2);font-size:16.5px;line-height:1.7;margin:0}
+.eyebrow{font-size:11.5px;font-weight:700;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--accent);margin-bottom:14px}
 
-/* hero */
-.hero-wrap{position:relative;overflow:hidden;
-  border-bottom:1px solid var(--line);
+/* ---------- hero: centred, so the headline is not marooned on the left --- */
+.hero-wrap{position:relative;overflow:hidden;border-bottom:1px solid var(--line);
   background:
-    radial-gradient(900px 380px at 15% -10%,
-      color-mix(in srgb, var(--accent) 13%, transparent), transparent 70%),
-    radial-gradient(700px 340px at 88% 0%,
-      color-mix(in srgb, var(--review) 9%, transparent), transparent 65%)}
-.hero-in{max-width:var(--max);margin:0 auto;padding:96px 24px 84px}
-.hero h1{font-size:clamp(34px,5.4vw,56px);font-weight:720;letter-spacing:-.04em;
-  line-height:1.06;max-width:15ch}
+    radial-gradient(880px 420px at 50% -12%,
+      color-mix(in srgb, var(--accent) 14%, transparent), transparent 72%),
+    radial-gradient(620px 300px at 88% 8%,
+      color-mix(in srgb, var(--review) 8%, transparent), transparent 68%)}
+.hero-in{max-width:820px;margin:0 auto;padding:104px 28px 92px;text-align:center}
+.hero h1{font-size:clamp(35px,5.6vw,58px);font-weight:730;letter-spacing:-.042em;
+  line-height:1.05;margin:0 auto;max-width:17ch}
 .hero h1 em{font-style:normal;color:var(--accent)}
-.hero p{margin:22px 0 0;font-size:18px;line-height:1.62;color:var(--ink-2);
-  max-width:56ch}
-.hero .row{display:flex;gap:12px;margin-top:32px;flex-wrap:wrap}
-.hero .facts{display:flex;gap:34px;margin-top:52px;flex-wrap:wrap}
-.fact b{display:block;font-size:25px;font-weight:700;letter-spacing:-.025em}
+.hero p{margin:24px auto 0;font-size:18px;line-height:1.62;color:var(--ink-2);
+  max-width:54ch}
+.hero .row{display:flex;gap:12px;margin-top:34px;flex-wrap:wrap;
+  justify-content:center}
+.hero .facts{display:flex;justify-content:center;margin-top:58px;flex-wrap:wrap}
+.fact{padding:0 30px;border-left:1px solid var(--line);text-align:center}
+.fact:first-child{border-left:0}
+.fact b{display:block;font-size:27px;font-weight:710;letter-spacing:-.03em;
+  line-height:1.15}
 .fact span{font-size:12.5px;color:var(--muted)}
 
-/* generic grid */
-.grid{display:grid;gap:16px;margin-top:36px}
-.g2{grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
-.g3{grid-template-columns:repeat(auto-fit,minmax(248px,1fr))}
+/* ---------- grids: explicit columns, so six cards never leave two orphans
+   on a row of four ---------- */
+.grid{display:grid;gap:16px}
+.g2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.g3{grid-template-columns:repeat(3,minmax(0,1fr))}
 .box{background:var(--card);border:1px solid var(--line);border-radius:15px;
-  padding:24px;box-shadow:var(--shadow)}
-.box h3{font-size:16px;font-weight:650;margin-bottom:8px;letter-spacing:-.01em}
-.box p{margin:0;font-size:14px;line-height:1.65;color:var(--ink-2)}
-.box .ico{font-size:20px;margin-bottom:14px;display:block}
+  padding:26px;box-shadow:var(--shadow);display:flex;flex-direction:column}
+.box h3{font-size:16px;font-weight:660;margin-bottom:9px;letter-spacing:-.012em}
+.box p{margin:0;font-size:14px;line-height:1.68;color:var(--ink-2)}
+.box .ico{font-size:21px;margin-bottom:15px;display:block;line-height:1}
 
-/* the problem: side-by-side messages */
-.msg{border-radius:13px;padding:15px 17px;font-size:14px;line-height:1.6;
-  border:1px solid var(--line);background:var(--card)}
-.msg .tag{font-size:11px;font-weight:680;letter-spacing:.05em;
-  text-transform:uppercase;display:block;margin-bottom:9px}
+/* ---------- the two example messages ---------- */
+.msg{border-radius:14px;padding:20px 22px;border:1px solid var(--line);
+  background:var(--card);box-shadow:var(--shadow);display:flex;
+  flex-direction:column}
+.msg .tag{font-size:11px;font-weight:700;letter-spacing:.06em;
+  text-transform:uppercase;display:block;margin-bottom:12px}
 .msg.ok .tag{color:var(--good)}
 .msg.bad .tag{color:var(--ban)}
-.msg .txt{color:var(--ink);font-size:14.5px}
-.msg .note{margin-top:11px;font-size:12.5px;color:var(--muted);
-  padding-top:11px;border-top:1px solid var(--line-soft)}
+.msg .txt{color:var(--ink);font-size:15px;line-height:1.6}
+.msg .note{margin-top:auto;padding-top:14px;font-size:12.5px;color:var(--muted);
+  border-top:1px solid var(--line-soft);line-height:1.6}
+.punch{max-width:660px;margin:28px auto 0;text-align:center;font-size:16px;
+  line-height:1.7;color:var(--ink-2)}
 
-/* pipeline */
+/* ---------- pipeline ---------- */
 .pipe{background:var(--card);border:1px solid var(--line);border-radius:16px;
-  padding:30px 26px;margin-top:36px;overflow-x:auto;box-shadow:var(--shadow)}
-.pipe svg{display:block;min-width:660px;width:100%;height:auto}
+  padding:30px 26px;margin-bottom:36px;overflow-x:auto;box-shadow:var(--shadow)}
+.pipe svg{display:block;min-width:620px;width:100%;height:auto}
 
-/* stack */
-.stack{display:flex;flex-wrap:wrap;gap:9px;margin-top:26px}
-.tech{padding:7px 13px;border-radius:8px;font-size:13px;color:var(--ink-2);
+/* ---------- stack ---------- */
+.stack{display:flex;flex-wrap:wrap;gap:9px;justify-content:center;
+  max-width:720px;margin:0 auto 38px}
+.tech{padding:8px 14px;border-radius:9px;font-size:13px;color:var(--ink-2);
   background:var(--card);border:1px solid var(--line)}
 
-/* footer */
-.lp-foot{border-top:1px solid var(--line);background:var(--card);margin-top:40px}
-.lp-foot .in{max-width:var(--max);margin:0 auto;padding:44px 24px;
-  display:flex;gap:34px;flex-wrap:wrap;align-items:flex-start}
-.lp-foot .col{min-width:170px}
-.lp-foot h4{font-size:12px;text-transform:uppercase;letter-spacing:.08em;
-  color:var(--muted);margin:0 0 12px;font-weight:660}
+/* ---------- footer: a grid, so the columns space evenly instead of
+   bunching to the left ---------- */
+.lp-foot{border-top:1px solid var(--line);background:var(--card)}
+.lp-foot .in{max-width:var(--max);margin:0 auto;padding:52px 28px 40px;
+  display:grid;grid-template-columns:1.6fr 1fr 1fr 1fr;gap:40px}
+.lp-foot h4{font-size:11.5px;text-transform:uppercase;letter-spacing:.1em;
+  color:var(--muted);margin:0 0 14px;font-weight:680}
 .lp-foot a,.lp-foot p{display:block;color:var(--ink-2);font-size:13.5px;
-  margin:0 0 8px;line-height:1.6}
+  margin:0 0 9px;line-height:1.6}
 .lp-foot a:hover{color:var(--accent-ink)}
-.lp-foot .bottom{max-width:var(--max);margin:0 auto;padding:0 24px 40px;
-  color:var(--muted);font-size:12.5px}
+.lp-foot .bottom{max-width:var(--max);margin:0 auto;padding:22px 28px 40px;
+  color:var(--muted);font-size:12.5px;border-top:1px solid var(--line-soft)}
 
-@media (max-width:860px){
-  .lp-head .in{height:auto;flex-wrap:wrap;padding:12px 18px;gap:10px}
-  .lp-cta{margin-left:auto}
-  /* The nav drops to its own scrollable row instead of vanishing — a header
-     with no navigation on a phone is a dead end, and most visitors arrive on
-     one. */
-  .lp-nav{order:3;width:100%;overflow-x:auto;gap:4px;padding-bottom:2px;
-    -webkit-overflow-scrolling:touch;scrollbar-width:none}
+@media (max-width:900px){
+  .lp-head .in{height:auto;grid-template-columns:auto 1fr;padding:12px 20px;
+    row-gap:10px}
+  .lp-cta{grid-column:2;justify-self:end}
+  /* the nav takes its own scrollable row rather than vanishing — a header
+     with no navigation is a dead end, and most visitors arrive on a phone */
+  .lp-nav{grid-column:1 / -1;grid-row:2;justify-self:stretch;overflow-x:auto;
+    gap:2px;scrollbar-width:none}
   .lp-nav::-webkit-scrollbar{display:none}
-  .lp-nav a{white-space:nowrap;padding:7px 11px;font-size:13.5px}
+  .lp-nav a{padding:7px 11px;font-size:13.5px}
+  .g3{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .lp-foot .in{grid-template-columns:1fr 1fr;gap:30px}
+  .fact{padding:0 20px}
+}
+@media (max-width:620px){
   .lp section{padding:60px 20px}
-  .hero-in{padding:60px 20px 54px}
-  .lp h2{font-size:24px}
-  .lp-foot .in{gap:26px;padding:36px 20px}
+  .hero-in{padding:64px 20px 56px}
+  .g2,.g3{grid-template-columns:minmax(0,1fr)}
+  .lp-foot .in{grid-template-columns:1fr;gap:26px;padding:38px 20px 30px}
+  .hero .facts{gap:22px 0}
+  .fact{flex:1 0 45%;border-left:0;padding:0}
 }
 """
 
@@ -128,55 +147,92 @@ CSS = """
 def _pipeline() -> str:
     """How a message is judged, as a diagram rather than a paragraph.
 
-    Drawn in SVG with currentColor-driven tokens so it follows the theme, and
-    with real text rather than an image, so it stays legible when scaled and
-    readable to a screen reader.
-    """
-    box = (
-        '<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="9" '
-        'fill="var(--raised)" stroke="var(--line)"/>'
-    )
-    out = ['<svg viewBox="0 0 980 210" role="img" aria-label="How a message is '
-           'judged: six detectors feed one policy, which decides.">'
-           '<style>.t{font:13px system-ui;fill:var(--ink)}'
-           '.s{font:11px system-ui;fill:var(--muted)}'
-           '.h{font:11px system-ui;font-weight:700;fill:var(--accent);'
-           'letter-spacing:.08em}</style>']
-    # incoming
-    out.append(box.format(x=0, y=72, w=132, h=62))
-    out.append('<text class="t" x="66" y="98" text-anchor="middle">Message</text>')
-    out.append('<text class="s" x="66" y="116" text-anchor="middle">text · file · edit</text>')
+    The six detectors sit in two rows, so the connectors fan out from a rail
+    rather than running straight across — an arrow drawn to the middle points
+    at the gap between the rows and connects nothing.
 
-    # detectors
-    out.append('<text class="h" x="196" y="26">SIGNALS</text>')
+    Real SVG text rather than an image: it stays sharp at any size, follows the
+    theme through CSS variables, and a screen reader can read it.
+    """
+    W, H = 980, 226
+    ROW_Y = (46, 128)          # top edge of each detector row
+    BOX_W, BOX_H, GAP_X = 158, 62, 172
+    COL_X = 214                # left edge of the first detector column
+    RAIL_IN, RAIL_OUT = 178, 726
+    MID = H / 2
+
+    line = ('<path d="{d}" fill="none" stroke="var(--line)" '
+            'stroke-width="1.5" stroke-linecap="round"/>')
+    box = ('<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="10" '
+           'fill="var(--raised)" stroke="var(--line)"/>')
+
+    out = [
+        f'<svg viewBox="0 0 {W} {H}" role="img" aria-label="A message is '
+        'checked by six independent detectors — keywords, links, files, pace, '
+        'sender profile and a language model. Their verdicts feed one policy, '
+        'which decides between allow, review, delete and remove.">'
+        '<style>.t{font:13.5px system-ui;fill:var(--ink)}'
+        '.s{font:11px system-ui;fill:var(--muted)}'
+        '.h{font:10.5px system-ui;font-weight:700;fill:var(--accent);'
+        'letter-spacing:.09em}</style>'
+    ]
+
+    # --- incoming ---------------------------------------------------------
+    out.append(box.format(x=0, y=MID - 33, w=128, h=66))
+    out.append(f'<text class="t" x="64" y="{MID - 4}" text-anchor="middle">Message</text>')
+    out.append(f'<text class="s" x="64" y="{MID + 15}" text-anchor="middle">'
+               "text · file · edit</text>")
+
+    row_mid = [y + BOX_H / 2 for y in ROW_Y]
+    # message -> vertical rail -> each row
+    out.append(line.format(d=f"M128 {MID} H{RAIL_IN}"))
+    out.append(line.format(d=f"M{RAIL_IN} {row_mid[0]} V{row_mid[1]}"))
+    for y in row_mid:
+        out.append(line.format(d=f"M{RAIL_IN} {y} H{COL_X - 8}"))
+        out.append(f'<path d="M{COL_X - 10} {y - 4} L{COL_X - 3} {y} '
+                   f'L{COL_X - 10} {y + 4}" fill="var(--muted)"/>')
+
+    # --- detectors --------------------------------------------------------
+    out.append(f'<text class="h" x="{COL_X}" y="28">SIGNALS</text>')
     names = [
         ("Keywords", "multilingual"), ("Links", "typosquats"),
-        ("Files", "fake .apk"), ("Pace", "flood / raid"),
-        ("Profile", "photo · bio"), ("Language model", "context-aware"),
+        ("Files", "disguised"), ("Pace", "flood · raid"),
+        ("Profile", "photo · bio"), ("Model", "context-aware"),
     ]
+    right = COL_X + 2 * GAP_X + BOX_W
     for i, (name, sub) in enumerate(names):
-        x, y = 196 + (i % 3) * 176, 40 + (i // 3) * 74
-        out.append(box.format(x=x, y=y, w=162, h=58))
-        out.append(f'<text class="t" x="{x + 14}" y="{y + 24}">{name}</text>')
-        out.append(f'<text class="s" x="{x + 14}" y="{y + 42}">{sub}</text>')
+        x, y = COL_X + (i % 3) * GAP_X, ROW_Y[i // 3]
+        out.append(box.format(x=x, y=y, w=BOX_W, h=BOX_H))
+        out.append(f'<text class="t" x="{x + 15}" y="{y + 26}">{name}</text>')
+        out.append(f'<text class="s" x="{x + 15}" y="{y + 45}">{sub}</text>')
 
-    # policy + outcome
-    out.append(box.format(x=736, y=40, w=110, h=126))
-    out.append('<text class="t" x="791" y="92" text-anchor="middle">Policy</text>')
-    out.append('<text class="s" x="791" y="110" text-anchor="middle">pure rules</text>')
-    out.append(box.format(x=872, y=40, w=108, h=126))
-    out.append('<text class="s" x="926" y="76" text-anchor="middle">Allow</text>')
-    out.append('<text class="s" x="926" y="100" text-anchor="middle">Review</text>')
-    out.append('<text class="s" x="926" y="124" text-anchor="middle">Delete</text>')
-    out.append('<text class="s" x="926" y="148" text-anchor="middle">Remove</text>')
+    # each row -> rail -> policy
+    for y in row_mid:
+        out.append(line.format(d=f"M{right} {y} H{RAIL_OUT}"))
+    out.append(line.format(d=f"M{RAIL_OUT} {row_mid[0]} V{row_mid[1]}"))
+    out.append(line.format(d=f"M{RAIL_OUT} {MID} H{RAIL_OUT + 34}"))
+    out.append(f'<path d="M{RAIL_OUT + 32} {MID - 4} L{RAIL_OUT + 39} {MID} '
+               f'L{RAIL_OUT + 32} {MID + 4}" fill="var(--muted)"/>')
 
-    for x1, x2, y in ((132, 196, 103), (712, 736, 103), (846, 872, 103)):
-        out.append(
-            f'<line x1="{x1}" y1="{y}" x2="{x2 - 6}" y2="{y}" '
-            f'stroke="var(--line)" stroke-width="1.5"/>'
-            f'<path d="M{x2 - 8} {y - 4} L{x2 - 2} {y} L{x2 - 8} {y + 4}" '
-            f'fill="var(--muted)"/>'
-        )
+    # --- policy + outcomes ------------------------------------------------
+    px = RAIL_OUT + 42
+    out.append(box.format(x=px, y=ROW_Y[0], w=112, h=ROW_Y[1] + BOX_H - ROW_Y[0]))
+    out.append(f'<text class="t" x="{px + 56}" y="{MID - 4}" text-anchor="middle">'
+               "Policy</text>")
+    out.append(f'<text class="s" x="{px + 56}" y="{MID + 15}" text-anchor="middle">'
+               "pure rules</text>")
+
+    ox = px + 112
+    out.append(line.format(d=f"M{ox} {MID} H{ox + 28}"))
+    out.append(f'<path d="M{ox + 26} {MID - 4} L{ox + 33} {MID} '
+               f'L{ox + 26} {MID + 4}" fill="var(--muted)"/>')
+    outcomes = [("Allow", "var(--good)"), ("Review", "var(--review)"),
+                ("Delete", "var(--delete)"), ("Remove", "var(--ban)")]
+    oy = ROW_Y[0] + 6
+    for i, (label, colour) in enumerate(outcomes):
+        y = oy + i * 26
+        out.append(f'<circle cx="{ox + 44}" cy="{y - 4}" r="4" fill="{colour}"/>')
+        out.append(f'<text class="s" x="{ox + 56}" y="{y}">{label}</text>')
     out.append("</svg>")
     return "".join(out)
 
@@ -218,14 +274,16 @@ def page(logo: str, signed_in: bool) -> str:
 </div></div>
 
 <section id="problem">
-  <div class="eyebrow">The problem</div>
-  <h2>The scam and the honest post look identical.</h2>
-  <p class="lead">Real communities talk about money constantly — job offers,
-  buying and selling, splitting bills, exchanging currency. A filter tuned to
-  flag those buries the group's actual purpose in false alarms, and eventually
-  removes the members who post most usefully. Measured against real traffic, a
-  generic ruleset flagged four of every fifteen legitimate posts, and banned
-  two of them outright.</p>
+  <div class="sec-head">
+    <div class="eyebrow">The problem</div>
+    <h2>The scam and the honest post look identical.</h2>
+    <p class="lead">Real communities talk about money constantly — job offers,
+    buying and selling, splitting bills, exchanging currency. A filter tuned to
+    flag those buries the group's purpose in false alarms, and eventually
+    removes the members who post most usefully. Measured against real traffic,
+    a generic ruleset flagged four of every fifteen legitimate posts, and
+    banned two of them outright.</p>
+  </div>
   <div class="grid g2">
     <div class="msg ok"><span class="tag">✓ Left alone</span>
       <div class="txt">“Anyone got a spare shift tomorrow? Happy to cover it —
@@ -238,20 +296,22 @@ def page(logo: str, signed_in: bool) -> str:
       <div class="note">Same subject, same tone. But money is demanded before
       anything is delivered.</div></div>
   </div>
-  <p class="lead" style="margin-top:26px"><b>The topic is never the signal.</b>
-  What separates the two is whether someone is asked to part with money or
-  credentials before receiving anything. Qalqon is built around that
-  distinction rather than around keywords about money — which is also why it
-  works the same way in a language it has never been tuned for.</p>
+  <p class="punch"><b>The topic is never the signal.</b> What separates the two
+  is whether someone is asked to part with money or credentials before
+  receiving anything. Qalqon is built around that distinction rather than
+  around keywords about money — which is also why it works the same way in a
+  language it has never been tuned for.</p>
 </section>
 
 <section id="how">
-  <div class="eyebrow">How it works</div>
-  <h2>Six signals, one decision.</h2>
-  <p class="lead">Every message is checked by cheap detectors first and the
-  language model only when it can still change the outcome. The signals are
-  combined, never averaged — and the rules that decide what happens are a pure
-  function with no network and no database, so every case can be tested.</p>
+  <div class="sec-head">
+    <div class="eyebrow">How it works</div>
+    <h2>Six signals, one decision.</h2>
+    <p class="lead">Cheap detectors run first; the language model only when it
+    can still change the outcome. The signals are combined, never averaged —
+    and the rules that decide what happens are a pure function with no network
+    and no database, so every case can be tested.</p>
+  </div>
   <div class="pipe">{_pipeline()}</div>
   <div class="grid g3">
     <div class="box"><span class="ico">🧠</span><h3>Context-aware</h3>
@@ -270,10 +330,12 @@ def page(logo: str, signed_in: bool) -> str:
 </section>
 
 <section id="safety">
-  <div class="eyebrow">Safety</div>
-  <h2>Built to be wrong safely.</h2>
-  <p class="lead">A moderation bot's worst failure is not missing a scam. It is
-  removing a real member — and doing it invisibly.</p>
+  <div class="sec-head">
+    <div class="eyebrow">Safety</div>
+    <h2>Built to be wrong safely.</h2>
+    <p class="lead">A moderation bot's worst failure is not missing a scam. It
+    is removing a real member — and doing it invisibly.</p>
+  </div>
   <div class="grid g3">
     <div class="box"><span class="ico">👥</span><h3>Two signals to act</h3>
       <p>A suspicious message alone is not enough. The sender's profile has to
@@ -300,12 +362,15 @@ def page(logo: str, signed_in: bool) -> str:
 </section>
 
 <section id="stack">
-  <div class="eyebrow">Built with</div>
-  <h2>Plain Python, tested hard.</h2>
-  <p class="lead">Event-driven Model–View–Controller: the controller translates
-  Telegram updates, the model holds every rule and all state, and views
-  subscribe to what it announces. The model imports no Telegram code at all,
-  which is what makes the whole decision path testable without a network.</p>
+  <div class="sec-head">
+    <div class="eyebrow">Built with</div>
+    <h2>Plain Python, tested hard.</h2>
+    <p class="lead">Event-driven Model–View–Controller: the controller
+    translates Telegram updates, the model holds every rule and all state, and
+    views subscribe to what it announces. The model imports no Telegram code at
+    all, which is what makes the whole decision path testable without a
+    network.</p>
+  </div>
   <div class="stack">
     <span class="tech">Python 3.12</span>
     <span class="tech">python-telegram-bot</span>
@@ -317,7 +382,7 @@ def page(logo: str, signed_in: bool) -> str:
     <span class="tech">pytest · 336 tests</span>
     <span class="tech">nginx · Let's Encrypt</span>
   </div>
-  <div class="grid g3" style="margin-top:30px">
+  <div class="grid g3">
     <div class="box"><h3>No network in the tests</h3>
       <p>Telegram, Groq and Hugging Face are all substituted, so the full
       escalation matrix runs in seconds on every change.</p></div>
