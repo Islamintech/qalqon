@@ -28,7 +28,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from config import settings  # noqa: E402
-from web import pages, queries, render  # noqa: E402
+from web import pages, pricing, queries, render  # noqa: E402
 from web.auth import (  # noqa: E402
     TOKEN_USER, is_allowed, issue_session, read_session, session_secret,
     verify_access_token, verify_telegram_login,
@@ -225,6 +225,13 @@ def _load(request: Request):
             "events": queries.recent_events(conn, chat_id),
             "offenders": queries.top_offenders(conn, chat_id),
             "health": queries.health(conn),
+            "usage": queries.usage_summary(conn, chat_id, days=days),
+            "usage_daily": queries.usage_daily(conn, chat_id, days=days),
+            "usage_by_chat": queries.usage_by_chat(conn, days=days),
+            "peak": queries.busiest_minute(conn, days=days),
+            "prices": pricing.fetch(settings.groq_api_key),
+            "model": settings.groq_model,
+            "token_limit": settings.groq_token_limit_per_minute,
         }
     finally:
         conn.close()
@@ -296,6 +303,18 @@ async def activity(request: Request):
     except Exception as exc:
         return _db_error(user_id, exc)
     return shell(pages.activity(data), user_id, "/activity")
+
+
+@app.get("/usage", response_class=HTMLResponse)
+async def usage(request: Request):
+    user_id, redirect = _guard(request)
+    if redirect:
+        return redirect
+    try:
+        data = _load(request)
+    except Exception as exc:
+        return _db_error(user_id, exc)
+    return shell(pages.usage(data), user_id, "/usage")
 
 
 @app.get("/privacy", response_class=HTMLResponse)

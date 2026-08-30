@@ -49,6 +49,7 @@ NAV = [
     ("/groups", "Groups", "◍"),
     ("/members", "Members", "◎"),
     ("/activity", "Activity", "◔"),
+    ("/usage", "Usage", "◑"),
 ]
 
 CSS = """
@@ -353,6 +354,69 @@ def bar_chart(daily: list[dict], height: int = 210) -> str:
                 f'width="{bar_w:.1f}" height="2" rx="1" fill="var(--line)"/>'
             )
 
+    out.append(
+        f'<line x1="{pad_l}" y1="{pad_t + plot_h}" x2="{w - pad_r}" '
+        f'y2="{pad_t + plot_h}" stroke="var(--line)" stroke-width="1"/>'
+    )
+    every = 1 if n <= 8 else (2 if n <= 16 else 5)
+    for i, d in enumerate(daily):
+        if i % every and i != n - 1:
+            continue
+        cx = pad_l + i * band + band / 2
+        out.append(
+            f'<text x="{cx:.1f}" y="{height - 8}" text-anchor="middle">'
+            f'{d["day"][5:]}</text>'
+        )
+    out.append("</svg>")
+    return "".join(out)
+
+
+def tokens_chart(daily: list[dict], height: int = 180) -> str:
+    """Tokens per day, with the cached share shown beneath.
+
+    One series with a second stacked underneath rather than two charts: the
+    question is "how much did we use, and how much of it did the cache save",
+    and those only mean anything side by side.
+    """
+    n = len(daily)
+    if not n:
+        return ""
+    peak = max(d["tokens"] for d in daily) or 1
+    # Round up to something readable rather than to the raw peak.
+    mag = 10 ** max(len(str(int(peak))) - 2, 0)
+    top = ((int(peak) // mag) + 1) * mag
+
+    pad_l, pad_r, pad_t, pad_b = 48, 6, 10, 26
+    w = 760
+    plot_w, plot_h = w - pad_l - pad_r, height - pad_t - pad_b
+    band = plot_w / n
+    bar_w = min(band * 0.6, 30)
+
+    def fmt(v: int) -> str:
+        return f"{v // 1000}k" if v >= 1000 else str(v)
+
+    out = [
+        f'<svg class="chart" viewBox="0 0 {w} {height}" role="img" '
+        f'aria-label="Tokens used per day">'
+    ]
+    for t in sorted({0, top // 2, top}):
+        y = pad_t + plot_h - (t / top) * plot_h
+        out.append(
+            f'<line x1="{pad_l}" y1="{y:.1f}" x2="{w - pad_r}" y2="{y:.1f}" '
+            f'stroke="var(--line-soft)" stroke-width="1"/>'
+            f'<text x="{pad_l - 9}" y="{y + 3.5:.1f}" text-anchor="end">'
+            f"{fmt(t)}</text>"
+        )
+    for i, d in enumerate(daily):
+        x = pad_l + i * band + (band - bar_w) / 2
+        h = (d["tokens"] / top) * plot_h
+        y = pad_t + plot_h - h
+        out.append(
+            f'<rect class="seg" x="{x:.1f}" y="{y:.1f}" width="{bar_w:.1f}" '
+            f'height="{max(h, 2):.1f}" rx="4" fill="var(--accent)">'
+            f'<title>{d["day"]}: {d["tokens"]:,} tokens over {d["calls"]} '
+            f'calls ({d["cached"]} from cache)</title></rect>'
+        )
     out.append(
         f'<line x1="{pad_l}" y1="{pad_t + plot_h}" x2="{w - pad_r}" '
         f'y2="{pad_t + plot_h}" stroke="var(--line)" stroke-width="1"/>'

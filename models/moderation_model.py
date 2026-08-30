@@ -169,6 +169,7 @@ class ModerationModel(Observable):
                 llm = await self._llm.analyze(
                     msg.text, context=self._describe(record, trusted, msg.text)
                 )
+                await self._record_usage(msg.chat_id)
                 content = Verdict.worst(llm, keyword, link)
                 if content.degraded:
                     await self._announce_degraded("language model", llm.reason)
@@ -270,6 +271,29 @@ class ModerationModel(Observable):
         )
         log.info("%s | %s", action.value, event.summary.replace("\n", " | "))
         await self.publish(event)
+
+    async def _record_usage(self, chat_id: int) -> None:
+        """Persist what the last analysis cost.
+
+        The client reports it; the Model writes it, because storage is the
+        Model's business and the client is an adapter that should not know a
+        database exists. Failures here are swallowed: bookkeeping must never
+        stop moderation.
+        """
+        stats = getattr(self._llm, "last", None)
+        if stats is None:
+            return
+        try:
+            await self._store.record_usage(
+                chat_id, kind="llm", model=stats.model,
+                prompt_tokens=stats.prompt_tokens,
+                completion_tokens=stats.completion_tokens,
+                reasoning_tokens=stats.reasoning_tokens,
+                latency_ms=stats.latency_ms, queue_ms=stats.queue_ms,
+                cached=stats.cached, ok=stats.ok,
+            )
+        except Exception as exc:
+            log.warning("could not record usage: %s", exc)
 
     def _scan_file(self, attachment: Attachment | None) -> Verdict:
         if attachment is None or not self._files:

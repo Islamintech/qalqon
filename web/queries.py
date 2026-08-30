@@ -186,3 +186,112 @@ def health(conn) -> dict:
         "last_event": last,
         "seconds_since": (time.time() - last) if last else None,
     }
+
+
+# --- usage / cost ----------------------------------------------------------
+def usage_summary(conn, chat_id: int | None = None, days: int = 14) -> dict:
+    """What the analysis actually cost, and how close it runs to the ceiling.
+
+    `analysed` counts every attempt that reached the model layer, including
+    cache hits and failures. Without that denominator the cache looks free and
+    the failures disappear.
+    """
+    where, args = _scope(chat_id)
+    since = time.time() - days * DAY
+    row = conn.execute(
+        f"SELECT COUNT(*) attempts, "
+        f"  SUM(cached) cached, SUM(ok=0) failed, "
+        f"  SUM(prompt_tokens) pin, SUM(completion_tokens) pout, "
+        f"  SUM(reasoning_tokens) reasoning, "
+        f"  AVG(NULLIF(latency_ms,0)) avg_ms, MAX(latency_ms) max_ms, "
+        f"  AVG(NULLIF(queue_ms,0)) avg_queue "
+        f"FROM usage {where} AND ts >= ?",
+        (*args, since),
+    ).fetchone()
+    attempts = row["attempts"] or 0
+    cached = row["cached"] or 0
+    billed = attempts - cached - (row["failed"] or 0)
+    # Messages the bot saw but never sent to the model at all — short chatter,
+    # trusted members, admins, whitelisted. The cheapest call is the one never
+    # made, so this is the number worth watching.
+    seen = conn.execute(
+        f"SELECT COALESCE(SUM(messages_seen),0) FROM users {where}", args
+    ).fetchone()[0]
+    return {
+        "attempts": attempts,
+        "billed": max(billed, 0),
+        "cached": cached,
+        "failed": row["failed"] or 0,
+        "prompt_tokens": row["pin"] or 0,
+        "completion_tokens": row["pout"] or 0,
+        "reasoning_tokens": row["reasoning"] or 0,
+        "total_tokens": (row["pin"] or 0) + (row["pout"] or 0),
+        "avg_ms": int(row["avg_ms"] or 0),
+        "max_ms": int(row["max_ms"] or 0),
+        "avg_queue_ms": int(row["avg_queue"] or 0),
+        "messages_seen": seen,
+        "model": _busiest_model(conn, since),
+    }
+
+
+def _busiest_model(conn, since: float) -> str:
+    row = conn.execute(
+        "SELECT model, COUNT(*) c FROM usage WHERE ts >= ? AND model != '' "
+        "GROUP BY model ORDER BY c DESC LIMIT 1",
+        (since,),
+    ).fetchone()
+    return row["model"] if row else ""
+
+
+def usage_daily(conn, chat_id: int | None = None, days: int = 14) -> list[dict]:
+    where, args = _scope(chat_id)
+    since = time.time() - days * DAY
+    rows = conn.execute(
+        f"SELECT ts, prompt_tokens, completion_tokens, cached FROM usage "
+        f"{where} AND ts >= ?",
+        (*args, since),
+    ).fetchall()
+    buckets = {}
+    for i in range(days):
+        day = datetime.fromtimestamp(
+            time.time() - (days - 1 - i) * DAY, tz=timezone.utc
+        ).strftime("%Y-%m-%d")
+        buckets[day] = {"tokens": 0, "calls": 0, "cached": 0}
+    for r in rows:
+        day = datetime.fromtimestamp(r["ts"], tz=timezone.utc).strftime("%Y-%m-%d")
+        if day not in buckets:
+            continue
+        buckets[day]["tokens"] += (r["prompt_tokens"] or 0) + (r["completion_tokens"] or 0)
+        buckets[day]["calls"] += 1
+        buckets[day]["cached"] += 1 if r["cached"] else 0
+    return [{"day": d, **v} for d, v in buckets.items()]
+
+
+def busiest_minute(conn, days: int = 14) -> dict:
+    """The peak token-per-minute burst.
+
+    This is the number that matters operationally: the free tier caps tokens
+    per MINUTE, not per day, so a quiet week with one busy minute still gets
+    rate-limited — and a rate-limited moderator is a blind one.
+    """
+    since = time.time() - days * DAY
+    rows = conn.execute(
+        "SELECT CAST(ts/60 AS INTEGER) m, "
+        "SUM(prompt_tokens + completion_tokens) t, COUNT(*) c "
+        "FROM usage WHERE ts >= ? AND cached = 0 GROUP BY m ORDER BY t DESC LIMIT 1",
+        (since,),
+    ).fetchone()
+    if not rows or not rows["t"]:
+        return {"tokens": 0, "calls": 0, "at": None}
+    return {"tokens": rows["t"], "calls": rows["c"], "at": rows["m"] * 60}
+
+
+def usage_by_chat(conn, days: int = 14) -> list[dict]:
+    since = time.time() - days * DAY
+    rows = conn.execute(
+        "SELECT chat_id, COUNT(*) attempts, SUM(cached) cached, "
+        "  SUM(prompt_tokens + completion_tokens) tokens "
+        "FROM usage WHERE ts >= ? GROUP BY chat_id ORDER BY tokens DESC",
+        (since,),
+    ).fetchall()
+    return [dict(r) for r in rows]

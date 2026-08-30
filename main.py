@@ -177,6 +177,7 @@ def main() -> None:
             logging.getLogger("qalqon").info("pruned %s expired strikes", pruned)
         # Retention is enforced on every start, so a long-running deployment
         # cannot quietly accumulate an archive of other people's messages.
+        await store.prune_usage()
         forgotten = await store.prune_events()
         if forgotten:
             logging.getLogger("qalqon").info(

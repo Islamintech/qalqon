@@ -273,3 +273,115 @@ def _feed_item(ev, chats) -> str:
         f'</details></div>'
         f'<div class="when">{when(ev["ts"])}</div></div>'
     )
+
+
+def usage(data) -> str:
+    """What the analysis costs, and how close it runs to the rate limit.
+
+    Cost is the least interesting number here — moderating a hundred thousand
+    messages runs to single-digit dollars. The figures that decide whether this
+    keeps working are the peak tokens-per-minute against the account's ceiling,
+    and how many messages never reached the model at all.
+    """
+    u, prices = data["usage"], data["prices"]
+    peak, days = data["peak"], data["days"]
+    model = u["model"] or data["model"]
+
+    if not u["attempts"]:
+        return pages_head_usage() + render.empty(
+            "◔", "No analysis recorded yet",
+            "Every message Qalqon sends to the language model is logged here "
+            "with its token count and latency. Nothing has been analysed in "
+            "this period.",
+        )
+
+    from web import pricing
+
+    total = pricing.cost(
+        model, u["prompt_tokens"], u["completion_tokens"], prices
+    )
+    per_k = pricing.per_thousand(model, u, prices)
+
+    # The ceiling that actually bites: tokens per minute, not per day.
+    limit = data["token_limit"]
+    pct = (peak["tokens"] / limit * 100) if limit and peak["tokens"] else 0
+    if pct >= 90:
+        headroom = ('<div class="note"><b>At the limit.</b> A busy minute has '
+                    f'already reached {pct:.0f}% of your {limit:,} tokens/minute '
+                    'allowance. Beyond it Qalqon is rate-limited and falls back '
+                    'to keyword checks only — it keeps running, but stops '
+                    'seeing subtle scams. Raising the tier or trimming the '
+                    'prompt would both help.</div>')
+    elif pct >= 50:
+        headroom = ('<div class="note"><b>Worth watching.</b> The busiest minute '
+                    f'used {pct:.0f}% of your {limit:,} tokens/minute allowance. '
+                    'A raid or a second busy group could exceed it.</div>')
+    else:
+        headroom = ""
+
+    skipped = max(u["messages_seen"] - u["attempts"], 0)
+    skip_pct = (skipped / u["messages_seen"] * 100) if u["messages_seen"] else 0
+
+    avg_prompt = (u["prompt_tokens"] // u["billed"]) if u["billed"] else 0
+    prompt_share = (
+        u["prompt_tokens"] / u["total_tokens"] * 100 if u["total_tokens"] else 0
+    )
+
+    chart = ""
+    if any(d["tokens"] for d in data["usage_daily"]):
+        chart = (
+            f'<div class="card pad" style="margin-bottom:26px">'
+            f'{render.tokens_chart(data["usage_daily"])}</div>'
+        )
+
+    rows = "".join(
+        f'<tr><td>{e(group_name(data["chats"], c["chat_id"]))}</td>'
+        f'<td class=num>{c["attempts"]}</td>'
+        f'<td class=num dim>{c["cached"] or 0}</td>'
+        f'<td class=num>{c["tokens"]:,}</td>'
+        f'<td class=num>{pricing.money(pricing.cost(model, c["tokens"], 0, prices))}'
+        f"</td></tr>"
+        for c in data["usage_by_chat"]
+    )
+    by_chat = (
+        f'<div class="card wrap"><table><thead><tr><th>group</th>'
+        f"<th>analysed</th><th>from cache</th><th>tokens</th><th>cost</th>"
+        f"</tr></thead><tbody>{rows}</tbody></table></div>"
+        if rows else ""
+    )
+
+    return (
+        pages_head_usage(f"last {days} days · {e(model)}")
+        + tiles([
+            ("messages analysed", f'{u["attempts"]:,}'),
+            ("tokens used", f'{u["total_tokens"]:,}'),
+            ("estimated cost", pricing.money(total)),
+            ("per 1,000 messages", pricing.money(per_k)),
+        ])
+        + chart
+        + head("Throughput", "the limit is per minute, not per day")
+        + tiles([
+            ("busiest minute", f'{peak["tokens"]:,} tok'),
+            ("of the limit", f"{pct:.0f}%" if limit else "—"),
+            ("average reply", f'{u["avg_ms"]:,} ms'),
+            ("slowest reply", f'{u["max_ms"]:,} ms'),
+        ])
+        + headroom
+        + head("What was avoided", "the cheapest call is the one never made")
+        + tiles([
+            ("never sent to the model", f"{skipped:,}"),
+            ("of all messages", f"{skip_pct:.0f}%"),
+            ("answered from cache", f'{u["cached"]:,}'),
+            ("failed calls", f'{u["failed"]:,}'),
+        ])
+        + f'<div class="note"><b>{avg_prompt:,} tokens go in for every reply, '
+          f"and {prompt_share:.0f}% of all tokens are the prompt rather than the "
+          f"answer.</b> The instructions are re-sent with every single message, "
+          f"so shortening them is the one change that reduces both cost and "
+          f"rate-limit pressure — for every group at once.</div>"
+        + (head("By group", f"last {days} days") + by_chat if by_chat else "")
+    )
+
+
+def pages_head_usage(sub: str = "") -> str:
+    return head("Usage", sub or "Token spend, speed, and what was avoided")

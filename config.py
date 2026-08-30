@@ -116,6 +116,14 @@ class Settings:
     # 0 keeps everything forever.
     event_retention_days: int = int(os.getenv("EVENT_RETENTION_DAYS", "90"))
 
+    # Your account's tokens-per-minute ceiling for the Groq model. This is the
+    # limit that actually bites — it is per MINUTE, so a quiet week with one
+    # busy minute still gets rate-limited. Read it from the
+    # x-ratelimit-limit-tokens header on any API response.
+    groq_token_limit_per_minute: int = int(
+        os.getenv("GROQ_TOKEN_LIMIT_PER_MINUTE", "8000")
+    )
+
     # Safety switch. When True the bot only REPORTS what it would do and never
     # actually deletes or bans. Keep this on until you trust the detection.
     dry_run: bool = os.getenv("DRY_RUN", "true").lower() == "true"

@@ -29,7 +29,7 @@ STATUS_WHITELISTED = "whitelisted"
 STATUS_BANNED = "banned"
 
 DAY = 86400.0
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS users (
@@ -67,6 +67,22 @@ CREATE TABLE IF NOT EXISTS chats (
     first_seen REAL NOT NULL DEFAULT 0,
     last_seen  REAL NOT NULL DEFAULT 0
 );
+CREATE TABLE IF NOT EXISTS usage (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    ts          REAL    NOT NULL,
+    chat_id     INTEGER NOT NULL,
+    kind        TEXT    NOT NULL DEFAULT 'llm',   -- llm | vision
+    model       TEXT    NOT NULL DEFAULT '',
+    prompt_tokens     INTEGER NOT NULL DEFAULT 0,
+    completion_tokens INTEGER NOT NULL DEFAULT 0,
+    reasoning_tokens  INTEGER NOT NULL DEFAULT 0,
+    latency_ms  INTEGER NOT NULL DEFAULT 0,
+    queue_ms    INTEGER NOT NULL DEFAULT 0,
+    cached      INTEGER NOT NULL DEFAULT 0,
+    ok          INTEGER NOT NULL DEFAULT 1
+);
+CREATE INDEX IF NOT EXISTS usage_ts ON usage (ts DESC);
+CREATE INDEX IF NOT EXISTS usage_chat ON usage (chat_id, ts DESC);
 CREATE TABLE IF NOT EXISTS meta (
     key   TEXT PRIMARY KEY,
     value TEXT NOT NULL
@@ -396,6 +412,49 @@ class Store:
             conn.commit()
 
         await self._run(_clear, chat_id, user_id)
+
+    async def record_usage(
+        self, chat_id: int, *, kind: str = "llm", model: str = "",
+        prompt_tokens: int = 0, completion_tokens: int = 0,
+        reasoning_tokens: int = 0, latency_ms: int = 0, queue_ms: int = 0,
+        cached: bool = False, ok: bool = True,
+    ) -> None:
+        """Record one analysis attempt.
+
+        Written for cache hits and failures too, not only successful API calls:
+        the useful questions are "how much did we avoid paying" and "how close
+        are we to the rate limit", and both need the denominator. A table of
+        successes alone would flatter the cache and hide the failures.
+        """
+        def _rec(conn, *args):
+            conn.execute(
+                "INSERT INTO usage (ts,chat_id,kind,model,prompt_tokens,"
+                "completion_tokens,reasoning_tokens,latency_ms,queue_ms,"
+                "cached,ok) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                args,
+            )
+            conn.commit()
+
+        await self._run(
+            _rec, time.time(), chat_id, kind, model, prompt_tokens,
+            completion_tokens, reasoning_tokens, latency_ms, queue_ms,
+            int(cached), int(ok),
+        )
+
+    async def prune_usage(self) -> int:
+        """Usage rows follow the same retention as moderation records — they
+        are one row per analysed message, so they grow faster than anything
+        else in the database."""
+        if not self._retention_days:
+            return 0
+        cutoff = time.time() - self._retention_days * DAY
+
+        def _prune(conn, cutoff):
+            cur = conn.execute("DELETE FROM usage WHERE ts < ?", (cutoff,))
+            conn.commit()
+            return cur.rowcount
+
+        return await self._run(_prune, cutoff)
 
     async def prune_events(self) -> int:
         """Delete moderation records older than the retention window.

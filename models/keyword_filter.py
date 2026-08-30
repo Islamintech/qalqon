@@ -44,8 +44,8 @@ SCAM_PATTERNS: list[str] = [
     r"\b(crypto|forex|investment)\b.{0,20}\b(profit|guaranteed|returns)\b",
     r"\bfree (money|gift|giveaway)\b",
     # uz: "kafolatlangan foyda", "foyda kafolatlanadi", "kuniga 10% foyda"
-    rf"\bkafolat\w*\b.{{0,25}}\b(foyda|daromad|pul)\b",
-    rf"\b(foyda|daromad)\b.{{0,25}}\bkafolat\w*",
+    r"\bkafolat\w*\b.{0,25}\b(foyda|daromad|pul)\b",
+    r"\b(foyda|daromad)\b.{0,25}\bkafolat\w*",
     r"\bkuniga\s*\d{1,3}\s*%",
     # ru: "гарантированный доход", "20% в день"
     r"\bгарантирован\w*\b.{0,25}\b(доход|прибыл|заработ)",

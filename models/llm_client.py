@@ -25,12 +25,32 @@ import logging
 import random
 import re
 import time
+from dataclasses import dataclass
 
 from groq import AsyncGroq
 
 from .verdict import Verdict, Risk
 
 log = logging.getLogger("qalqon.llm")
+
+
+@dataclass
+class CallStats:
+    """What one analysis actually cost.
+
+    Reported on the client rather than returned inside the Verdict, because a
+    Verdict is a judgement and this is bookkeeping — mixing them would put
+    billing data into the object the policy reasons about.
+    """
+
+    model: str = ""
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    reasoning_tokens: int = 0
+    latency_ms: int = 0
+    queue_ms: int = 0
+    cached: bool = False
+    ok: bool = True
 
 SYSTEM_PROMPT = """You are a moderation assistant for Telegram groups whose
 members are Uzbek workers living in South Korea. Messages arrive in Uzbek,
@@ -120,6 +140,8 @@ class LLMClient:
         self.failures = 0
         self._consecutive_failures = 0
         self._last_attempts = 0
+        # Refreshed on every analyze(); the Model reads it and persists it.
+        self.last: CallStats = CallStats()
 
     @property
     def degraded(self) -> bool:
@@ -146,6 +168,7 @@ class LLMClient:
 
     async def _call(self, user_content: str) -> Verdict:
         """One analysis with retries. Raises if every attempt failed."""
+        started = time.perf_counter()
         last: Exception | None = None
         self._last_attempts = 0
         for attempt in range(self._max_attempts):
@@ -162,6 +185,16 @@ class LLMClient:
                             {"role": "user", "content": user_content},
                         ],
                     )
+                usage = getattr(resp, "usage", None)
+                details = getattr(usage, "completion_tokens_details", None)
+                self.last = CallStats(
+                    model=getattr(resp, "model", self._model),
+                    prompt_tokens=getattr(usage, "prompt_tokens", 0) or 0,
+                    completion_tokens=getattr(usage, "completion_tokens", 0) or 0,
+                    reasoning_tokens=getattr(details, "reasoning_tokens", 0) or 0,
+                    latency_ms=int((time.perf_counter() - started) * 1000),
+                    queue_ms=int((getattr(usage, "queue_time", 0) or 0) * 1000),
+                )
                 data = json.loads(resp.choices[0].message.content)
                 risk = Risk(str(data.get("risk", "CLEAN")).upper())
                 return Verdict(risk, str(data.get("reason", ""))[:200], "llm")
@@ -183,6 +216,7 @@ class LLMClient:
         key = hashlib.sha256(_normalize(text).encode()).hexdigest()
         cached = self._cache_get(key)
         if cached is not None:
+            self.last = CallStats(model=self._model, cached=True)
             return Verdict(cached.risk, f"{cached.reason} (cached)", "llm")
 
         user_content = f"{context}\n\nMESSAGE:\n{text}" if context else text
@@ -197,6 +231,7 @@ class LLMClient:
         except Exception as exc:
             self.failures += 1
             self._consecutive_failures += 1
+            self.last = CallStats(model=self._model, ok=False)
             log.error(
                 "llm unavailable after %s attempt(s) (%s consecutive): %s",
                 getattr(self, "_last_attempts", 1), self._consecutive_failures, exc,
