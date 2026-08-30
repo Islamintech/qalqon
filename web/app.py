@@ -103,8 +103,8 @@ def _document(inner: str, extra_css: str = "", public: bool = False) -> HTMLResp
     )
     desc = (
         "Qalqon is an anti-scam moderation bot for Telegram communities. It "
-        "detects fraud in Uzbek, Russian and English, removes clear attacks, "
-        "and asks a human about the rest."
+        "detects fraud across languages, removes clear attacks, and asks a "
+        "human about the rest."
     )
     return HTMLResponse(
         "<!doctype html><html lang=en><head><meta charset=utf-8>"

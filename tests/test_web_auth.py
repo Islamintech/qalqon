@@ -261,3 +261,16 @@ def test_the_landing_page_leaks_no_group_data():
         body = client.get("/").text
     for leak in ("-100", "@islamun", "@vivora", "chat_id"):
         assert leak not in body, f"landing page leaked {leak}"
+
+
+def test_the_landing_page_names_no_specific_community():
+    """The product is general; which communities happen to use it is their
+    business, not a marketing detail."""
+    from fastapi.testclient import TestClient
+
+    from web.app import app
+
+    with TestClient(app) as client:
+        body = client.get("/").text.lower()
+    for term in ("uzbek", "korea", "so'm", "krw", "uzs"):
+        assert term not in body, f"landing page names {term}"

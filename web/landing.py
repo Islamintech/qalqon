@@ -16,21 +16,24 @@ CSS = """
 .lp a{text-decoration:none}
 
 /* header */
-.lp-head{position:sticky;top:0;z-index:20;backdrop-filter:blur(12px);
-  background:color-mix(in srgb, var(--page) 82%, transparent);
+.lp-head{position:sticky;top:0;z-index:20;backdrop-filter:saturate(180%) blur(14px);
+  background:color-mix(in srgb, var(--page) 78%, transparent);
   border-bottom:1px solid var(--line)}
-.lp-head .in{max-width:var(--max);margin:0 auto;padding:14px 24px;
-  display:flex;align-items:center;gap:26px}
-.lp-brand{display:flex;align-items:center;gap:9px;font-weight:680;font-size:17px;
-  letter-spacing:-.02em;color:var(--ink)}
-.lp-nav{display:flex;gap:22px;margin-left:12px}
-.lp-nav a{color:var(--ink-2);font-size:14px;font-weight:520}
-.lp-nav a:hover{color:var(--ink)}
+.lp-head .in{max-width:var(--max);margin:0 auto;padding:0 24px;height:64px;
+  display:flex;align-items:center;gap:8px}
+.lp-brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:18px;
+  letter-spacing:-.025em;color:var(--ink);margin-right:14px}
+.lp-brand svg{width:22px;height:24px}
+.lp-nav{display:flex;gap:2px;align-items:center}
+.lp-nav a{color:var(--ink-2);font-size:14px;font-weight:540;padding:8px 13px;
+  border-radius:8px;line-height:1}
+.lp-nav a:hover{color:var(--ink);background:var(--raised)}
 .lp-cta{margin-left:auto;display:flex;gap:10px;align-items:center}
-.lp-btn{padding:9px 17px;border-radius:9px;font-size:14px;font-weight:600;
-  background:var(--accent);color:#fff;white-space:nowrap}
-.lp-btn:hover{filter:brightness(1.08)}
-.lp-btn.ghost{background:transparent;color:var(--ink-2);
+.lp-btn{padding:10px 18px;border-radius:10px;font-size:14px;font-weight:620;
+  background:var(--accent);color:#fff;white-space:nowrap;line-height:1;
+  box-shadow:0 1px 2px rgba(16,20,24,.10)}
+.lp-btn:hover{filter:brightness(1.07)}
+.lp-btn.ghost{background:transparent;color:var(--ink-2);box-shadow:none;
   box-shadow:inset 0 0 0 1px var(--line)}
 .lp-btn.ghost:hover{color:var(--ink);box-shadow:inset 0 0 0 1px var(--accent)}
 
@@ -104,11 +107,20 @@ CSS = """
 .lp-foot .bottom{max-width:var(--max);margin:0 auto;padding:0 24px 40px;
   color:var(--muted);font-size:12.5px}
 
-@media (max-width:760px){
-  .lp-nav{display:none}
+@media (max-width:860px){
+  .lp-head .in{height:auto;flex-wrap:wrap;padding:12px 18px;gap:10px}
+  .lp-cta{margin-left:auto}
+  /* The nav drops to its own scrollable row instead of vanishing — a header
+     with no navigation on a phone is a dead end, and most visitors arrive on
+     one. */
+  .lp-nav{order:3;width:100%;overflow-x:auto;gap:4px;padding-bottom:2px;
+    -webkit-overflow-scrolling:touch;scrollbar-width:none}
+  .lp-nav::-webkit-scrollbar{display:none}
+  .lp-nav a{white-space:nowrap;padding:7px 11px;font-size:13.5px}
   .lp section{padding:60px 20px}
-  .hero-in{padding:64px 20px 56px}
+  .hero-in{padding:60px 20px 54px}
   .lp h2{font-size:24px}
+  .lp-foot .in{gap:26px;padding:36px 20px}
 }
 """
 
@@ -190,17 +202,16 @@ def page(logo: str, signed_in: bool) -> str:
 <div class="hero-wrap"><div class="hero-in hero">
   <div class="eyebrow">Telegram moderation</div>
   <h1>Scammers move faster than <em>moderators</em>.</h1>
-  <p>Qalqon watches Telegram groups for fraud — fake job offers, advance-fee
-  scams, phishing links and disguised malware — in Uzbek, Russian and English.
-  It removes what is clearly an attack, and asks a human about everything
-  else.</p>
+  <p>Qalqon watches Telegram groups for fraud — advance-fee scams, fake
+  offers, phishing links and disguised malware — across languages. It removes
+  what is clearly an attack, and asks a human about everything else.</p>
   <div class="row">
     <a class="lp-btn" href="#how">See how it works</a>
     <a class="lp-btn ghost" href="#problem">Why it was built</a>
   </div>
   <div class="facts">
     <div class="fact"><b>6</b><span>independent signals</span></div>
-    <div class="fact"><b>3</b><span>languages</span></div>
+    <div class="fact"><b>∞</b><span>languages</span></div>
     <div class="fact"><b>336</b><span>automated tests</span></div>
     <div class="fact"><b>&lt;1s</b><span>typical decision</span></div>
   </div>
@@ -209,25 +220,29 @@ def page(logo: str, signed_in: bool) -> str:
 <section id="problem">
   <div class="eyebrow">The problem</div>
   <h2>The scam and the honest post look identical.</h2>
-  <p class="lead">Qalqon was built for groups of Uzbek workers in South Korea.
-  Their two most common messages — daily shift announcements, and swapping
-  Korean won for Uzbek so'm — read exactly like fraud to a naive filter.
-  An off-the-shelf ruleset flagged four of every fifteen legitimate posts,
-  and banned two of them outright.</p>
+  <p class="lead">Real communities talk about money constantly — job offers,
+  buying and selling, splitting bills, exchanging currency. A filter tuned to
+  flag those buries the group's actual purpose in false alarms, and eventually
+  removes the members who post most usefully. Measured against real traffic, a
+  generic ruleset flagged four of every fifteen legitimate posts, and banned
+  two of them outright.</p>
   <div class="grid g2">
     <div class="msg ok"><span class="tag">✓ Left alone</span>
-      <div class="txt">“So'm kerak edi, kimda bor? Karta orqali o'tkazaman”</div>
-      <div class="note">A currency exchange offer. Ordinary business in these
-      groups — and the message an earlier version banned on sight.</div></div>
+      <div class="txt">“Anyone got a spare shift tomorrow? Happy to cover it —
+      message me”</div>
+      <div class="note">Every keyword here appears in scams too. Nothing is
+      being asked of anyone, so nothing happens.</div></div>
     <div class="msg bad"><span class="tag">✕ Removed</span>
-      <div class="txt">“Avval siz pul o'tkazing, keyin men won yuboraman”</div>
-      <div class="note">“You transfer first, then I'll send.” Same topic, same
-      language — but payment is demanded up front.</div></div>
+      <div class="txt">“I can get you the job — just send the 300 deposit
+      first and I'll confirm today”</div>
+      <div class="note">Same subject, same tone. But money is demanded before
+      anything is delivered.</div></div>
   </div>
   <p class="lead" style="margin-top:26px"><b>The topic is never the signal.</b>
-  What separates the two is whether someone is asked to part with money before
-  receiving anything. Qalqon is built around that distinction, not around
-  keywords about money.</p>
+  What separates the two is whether someone is asked to part with money or
+  credentials before receiving anything. Qalqon is built around that
+  distinction rather than around keywords about money — which is also why it
+  works the same way in a language it has never been tuned for.</p>
 </section>
 
 <section id="how">
@@ -240,8 +255,8 @@ def page(logo: str, signed_in: bool) -> str:
   <div class="pipe">{_pipeline()}</div>
   <div class="grid g3">
     <div class="box"><span class="ico">🧠</span><h3>Context-aware</h3>
-      <p>The model is told what is normal in these communities, so a shift
-      announcement with a daily wage reads as recruitment rather than an
+      <p>The model is told what is normal for the community it guards, so a
+      job post quoting a daily rate reads as recruitment rather than an
       earnings promise.</p></div>
     <div class="box"><span class="ico">🔗</span><h3>Structural link checks</h3>
       <p>Homographs, typosquats, credentials-in-URL and buried double
@@ -333,7 +348,8 @@ def page(logo: str, signed_in: bool) -> str:
       <a href="https://github.com/Islamintech">Islombek Ergashev</a>
       <p style="color:var(--muted)">Built 2026</p></div>
   </div>
-  <div class="bottom">© 2026 Qalqon. Serving Uzbek communities in South Korea.</div>
+  <div class="bottom">© 2026 Qalqon. Anti-scam moderation for Telegram
+  communities.</div>
 </footer>
 </div>
 """
