@@ -232,6 +232,7 @@ def _load(request: Request):
             "prices": pricing.fetch(settings.groq_api_key),
             "model": settings.groq_model,
             "token_limit": settings.groq_token_limit_per_minute,
+            "billed": settings.groq_plan == "paid",
         }
     finally:
         conn.close()

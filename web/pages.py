@@ -302,6 +302,21 @@ def usage(data) -> str:
     )
     per_k = pricing.per_thousand(model, u, prices)
 
+    # Groq exposes no billing endpoint, so whether this key is charged cannot
+    # be detected. Printing a dollar figure for a free-tier key would be
+    # inventing a bill, so the wording changes instead of the number.
+    if data["billed"]:
+        cost_label, free_note = "cost", ""
+    else:
+        cost_label = "list price equivalent"
+        free_note = (
+            '<div class="note"><b>You are marked as being on the free tier, so '
+            "this is not a bill.</b> The figures are what this usage would cost "
+            "at list price — useful for projecting a paid plan, but nothing is "
+            "charged. Check your plan at console.groq.com and set "
+            "<code>GROQ_PLAN=paid</code> if that is wrong.</div>"
+        )
+
     # The ceiling that actually bites: tokens per minute, not per day.
     limit = data["token_limit"]
     pct = (peak["tokens"] / limit * 100) if limit and peak["tokens"] else 0
@@ -355,9 +370,10 @@ def usage(data) -> str:
         + tiles([
             ("messages analysed", f'{u["attempts"]:,}'),
             ("tokens used", f'{u["total_tokens"]:,}'),
-            ("estimated cost", pricing.money(total)),
+            (cost_label, pricing.money(total)),
             ("per 1,000 messages", pricing.money(per_k)),
         ])
+        + free_note
         + chart
         + head("Throughput", "the limit is per minute, not per day")
         + tiles([

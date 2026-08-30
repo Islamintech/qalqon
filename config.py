@@ -123,6 +123,12 @@ class Settings:
     groq_token_limit_per_minute: int = int(
         os.getenv("GROQ_TOKEN_LIMIT_PER_MINUTE", "8000")
     )
+    # Whether this key is actually billed. Groq exposes no billing endpoint, so
+    # this cannot be detected — and a dashboard that prints a dollar figure for
+    # a free-tier key is inventing a bill. Default "free": the cost column then
+    # reads as a list-price equivalent for planning, not as money owed.
+    # Check console.groq.com and set "paid" if you are on a paid plan.
+    groq_plan: str = os.getenv("GROQ_PLAN", "free").strip().lower()
 
     # Safety switch. When True the bot only REPORTS what it would do and never
     # actually deletes or bans. Keep this on until you trust the detection.

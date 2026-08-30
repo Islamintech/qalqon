@@ -132,3 +132,29 @@ def test_cost_per_thousand_needs_billed_calls():
         "m", {"billed": 10, "prompt_tokens": 7000, "completion_tokens": 1000}, prices
     )
     assert got == pytest.approx(0.17)
+
+
+# --- the dashboard must not invent a bill ----------------------------------
+def test_free_tier_is_not_presented_as_money_owed():
+    """Groq exposes no billing endpoint, so this cannot be detected. Printing
+    a dollar figure for a free-tier key would be inventing a bill."""
+    from web import pages
+
+    base = {
+        "usage": {
+            "attempts": 10, "billed": 10, "cached": 0, "failed": 0,
+            "prompt_tokens": 7000, "completion_tokens": 1000,
+            "reasoning_tokens": 0, "total_tokens": 8000, "avg_ms": 500,
+            "max_ms": 900, "avg_queue_ms": 10, "messages_seen": 40, "model": "m",
+        },
+        "prices": {"m": {"prompt": 1e-7, "completion": 1e-6}},
+        "peak": {"tokens": 900, "calls": 2, "at": None},
+        "days": 14, "model": "m", "token_limit": 8000,
+        "usage_daily": [], "usage_by_chat": [], "chats": [],
+    }
+    free = pages.usage({**base, "billed": False})
+    assert "not a bill" in free
+    assert "list price equivalent" in free
+
+    paid = pages.usage({**base, "billed": True})
+    assert "not a bill" not in paid
