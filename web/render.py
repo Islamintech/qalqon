@@ -126,7 +126,11 @@ main{flex:1;width:100%;max-width:1240px;margin:0 auto;padding:28px 26px 64px}
 .grow{flex:1}
 
 /* ---------- filters ---------- */
-.filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px}
+.filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center;
+  margin-bottom:20px}
+/* period and group are different questions; without a divider the five
+   chips read as one set and the current selection looks ambiguous. */
+.fsep{width:1px;align-self:stretch;background:var(--line);margin:2px 7px}
 .chip{padding:6px 13px;border-radius:8px;font-size:13px;color:var(--ink-2);
   background:var(--card);border:1px solid var(--line);white-space:nowrap}
 .chip:hover{text-decoration:none;border-color:var(--accent);color:var(--ink)}
@@ -148,6 +152,13 @@ main{flex:1;width:100%;max-width:1240px;margin:0 auto;padding:28px 26px 64px}
 .hero .v{font-size:clamp(34px,7vw,54px);font-weight:700;letter-spacing:-.045em;line-height:1;
   color:var(--accent-ink)}
 .hero .k{font-size:14px;color:var(--ink-2);line-height:1.5}
+/* the hero is full-bleed, so without something on the right it was a
+   metre of empty card. The obvious next step lives there. */
+.hero .go{margin-left:auto;font-size:13.5px;font-weight:600;
+  padding:9px 15px;border-radius:9px;background:var(--raised);
+  border:1px solid var(--line);color:var(--ink-2);white-space:nowrap}
+.hero .go:hover{border-color:var(--accent);color:var(--accent-ink);
+  text-decoration:none}
 
 /* ---------- action chips ---------- */
 .act{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;
@@ -183,7 +194,7 @@ main{flex:1;width:100%;max-width:1240px;margin:0 auto;padding:28px 26px 64px}
 .item .meta{font-size:12px;color:var(--muted);margin-top:3px}
 .item .said{font-size:13.5px;color:var(--ink-2);margin-top:9px;
   background:var(--raised);border-radius:9px;padding:9px 12px;
-  overflow-wrap:anywhere;border-left:2px solid var(--line)}
+  overflow-wrap:anywhere;border-left:2px solid var(--line);max-width:78ch}
 .item .when{margin-left:auto;font-size:12px;color:var(--muted);
   white-space:nowrap;padding-left:10px}
 
@@ -222,7 +233,11 @@ tbody tr:hover td{background:var(--raised)}
 
 .note{background:var(--delete-bg);border-radius:11px;padding:13px 17px;
   font-size:13px;color:var(--ink-2);line-height:1.55;margin-top:14px}
-details{margin-top:10px}
+details{margin-top:9px}
+summary{display:inline-flex;align-items:center;gap:5px;
+  padding:3px 9px;border-radius:7px;background:var(--raised)}
+summary::before{content:"▸";font-size:9px;opacity:.7}
+details[open] summary::before{content:"▾"}
 summary{cursor:pointer;font-size:12.5px;color:var(--muted);list-style:none}
 summary::-webkit-details-marker{display:none}
 summary:hover{color:var(--ink-2)}
@@ -356,7 +371,7 @@ def legend(keys=None) -> str:
     return f'<div class="legend">{items}</div>'
 
 
-def bar_chart(daily: list[dict], height: int = 210) -> str:
+def bar_chart(daily: list[dict], height: int = 232) -> str:
     """Stacked daily activity.
 
     2px surface gap between stacked segments rather than a border, rounded
@@ -373,11 +388,14 @@ def bar_chart(daily: list[dict], height: int = 210) -> str:
     step = 1 if peak <= 4 else (2 if peak <= 10 else 5 if peak <= 25 else 10)
     top = ((peak + step - 1) // step) * step
 
-    pad_l, pad_r, pad_t, pad_b = 34, 6, 10, 26
-    w = 760
+    # Drawn at close to its rendered width: an SVG stretched from a small
+    # viewBox scales its TEXT and hairlines with it, so the axis labels came
+    # out larger than the body copy and the gridlines looked like borders.
+    pad_l, pad_r, pad_t, pad_b = 40, 8, 12, 28
+    w = 1150
     plot_w, plot_h = w - pad_l - pad_r, height - pad_t - pad_b
     band = plot_w / n
-    bar_w = min(band * 0.6, 30)
+    bar_w = min(band * 0.62, 44)
 
     out = [
         f'<svg class="chart" viewBox="0 0 {w} {height}" role="img" '
@@ -449,7 +467,7 @@ def tokens_chart(daily: list[dict], height: int = 180) -> str:
     w = 760
     plot_w, plot_h = w - pad_l - pad_r, height - pad_t - pad_b
     band = plot_w / n
-    bar_w = min(band * 0.6, 30)
+    bar_w = min(band * 0.62, 44)
 
     def fmt(v: int) -> str:
         return f"{v // 1000}k" if v >= 1000 else str(v)

@@ -70,6 +70,24 @@ def act_chip(action: str) -> str:
 
 
 # --- pages -----------------------------------------------------------------
+def _activity_chart(daily) -> str:
+    """The chart plus its table twin. Shared by Activity and Overview: the
+    overview used to be nothing but boxes of numbers, which left most of the
+    page empty and gave no sense of when anything happened."""
+    day_rows = "".join(
+        f'<tr><td class=num>{d["day"]}</td><td class=num>{d["BAN"]}</td>'
+        f'<td class=num>{d["DELETE"]}</td><td class=num>{d["REVIEW"]}</td></tr>'
+        for d in reversed(daily)
+    )
+    return (
+        f'<div class="card pad">{render.legend()}{render.bar_chart(daily)}'
+        f'<details><summary>Show as a table</summary>'
+        f'<div class="wrap" style="margin-top:12px"><table><thead><tr>'
+        f"<th>day</th><th>removed</th><th>deleted</th><th>to review</th></tr>"
+        f"</thead><tbody>{day_rows}</tbody></table></div></details></div>"
+    )
+
+
 def overview(data) -> str:
     """Answers one question: is it working, and is it getting it right?"""
     acc, chats, ov, daily = data["acc"], data["chats"], data["ov"], data["daily"]
@@ -109,13 +127,16 @@ def overview(data) -> str:
         + f'<div class="card hero"><div><div class="v">{period}</div></div>'
         f'<div class="k"><b>actions in the last {data["days"]} days</b><br>'
         f'{ov["messages_seen"]} messages read · last activity '
-        f'{ago(data["health"]["last_event"])}</div></div>'
+        f'{ago(data["health"]["last_event"])}</div>'
+        f'<a class="go" href="/activity">See what happened →</a></div>'
         + tiles([
             ("members known", ov["users"]),
             ("currently banned", ov["banned"]),
             ("trusted", ov["whitelisted"]),
             ("active strikes", ov["active_strikes"]),
         ])
+        + (_activity_chart(daily) + '<div style="height:26px"></div>'
+           if any(d["REVIEW"] + d["DELETE"] + d["BAN"] for d in daily) else "")
         + head("Is it getting it right?")
         + tiles([
             ("decisions made", acc["bot_actions"]),
@@ -212,7 +233,7 @@ def activity(data) -> str:
         f'<a class="chip" href="{data["link"](days_v=d)}" '
         f'aria-current="{"true" if d == days else "false"}">{d} days</a>'
         for d in (7, 14, 30)
-    ) + "".join(
+    ) + '<span class="fsep"></span>' + "".join(
         f'<a class="chip" href="{data["link"](chat_v=cid)}" '
         f'aria-current="{"true" if chat_id == cid else "false"}">{e(label)}</a>'
         for cid, label in [(None, "All groups")]
@@ -230,18 +251,7 @@ def activity(data) -> str:
             )
         )
 
-    day_rows = "".join(
-        f'<tr><td class=num>{d["day"]}</td><td class=num>{d["BAN"]}</td>'
-        f'<td class=num>{d["DELETE"]}</td><td class=num>{d["REVIEW"]}</td></tr>'
-        for d in reversed(daily)
-    )
-    chart = (
-        f'<div class="card pad">{render.legend()}{render.bar_chart(daily)}'
-        f'<details><summary>▸ Show as a table</summary>'
-        f'<div class="wrap" style="margin-top:12px"><table><thead><tr>'
-        f"<th>day</th><th>removed</th><th>deleted</th><th>to review</th></tr>"
-        f"</thead><tbody>{day_rows}</tbody></table></div></details></div>"
-    )
+    chart = _activity_chart(daily)
 
     feed = "".join(_feed_item(ev, chats) for ev in events)
     return (
