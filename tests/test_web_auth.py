@@ -274,3 +274,50 @@ def test_the_landing_page_names_no_specific_community():
         body = client.get("/").text.lower()
     for term in ("uzbek", "korea", "so'm", "krw", "uzs"):
         assert term not in body, f"landing page names {term}"
+
+
+# --- signed-in pages must actually render -----------------------------------
+def _signed_in_client():
+    """A client holding a valid session.
+
+    The cookie is minted directly rather than by signing in, because the app
+    reads WEB_ACCESS_TOKEN once at import: whether a token login works depends
+    on which test imported web.app first, which made this flaky in the suite
+    and green on its own.
+    """
+    from fastapi.testclient import TestClient
+
+    from web import app as web_app
+    from web.auth import issue_session
+
+    client = TestClient(web_app.app)
+    client.cookies.set(web_app.COOKIE, issue_session(1, web_app.SECRET))
+    return client
+
+
+@pytest.mark.parametrize("path", ["/app", "/groups", "/members", "/activity", "/usage"])
+def test_every_dashboard_page_renders(path):
+    """These were only ever checked for their redirect, so a template that
+    raised — a renamed helper, say — passed the whole suite."""
+    with _signed_in_client() as client:
+        r = client.get(path)
+    assert r.status_code == 200, path
+    assert "<main>" in r.text
+
+
+@pytest.mark.parametrize("path", ["/app", "/activity"])
+def test_dashboard_html_tags_are_balanced(path):
+    """A stray closing tag survived a bulk edit and shipped on every page."""
+    with _signed_in_client() as client:
+        body = client.get(path).text
+    assert body.count("<main>") == body.count("</main>") == 1
+    assert body.count("<div") == body.count("</div>"), "unbalanced <div>"
+
+
+def test_the_dashboard_navigation_is_horizontal():
+    """Five destinations do not justify a fixed column stealing a fifth of the
+    width from the pages that need it most."""
+    with _signed_in_client() as client:
+        body = client.get("/app").text
+    assert 'class="topbar"' in body
+    assert "<aside" not in body

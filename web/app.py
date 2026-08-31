@@ -80,12 +80,13 @@ def e(value) -> str:
 
 
 def shell(body: str, user_id: int, active: str) -> HTMLResponse:
-    """A signed-in page: sidebar + content."""
+    """A signed-in page: top bar + content."""
     label = "signed in with a token" if user_id == TOKEN_USER else f"ID {user_id}"
     return _document(
         f'<div class="shell">'
-        f'{render.sidebar(active, settings.dry_run, label)}'
-        f'<main>{body}</div></main></div>'
+        f"{render.topbar(active, settings.dry_run, label)}"
+        f"<main>{body}</main>"
+        f"</div>"
     )
 
 

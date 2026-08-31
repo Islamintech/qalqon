@@ -86,23 +86,33 @@ a{color:var(--accent-ink);text-decoration:none}
 a:hover{text-decoration:underline}
 h1,h2,h3{margin:0}
 
-/* ---------- shell ---------- */
-.shell{display:flex;min-height:100vh}
-aside{width:216px;flex:none;background:var(--card);
-  border-right:1px solid var(--line);padding:20px 14px;
-  display:flex;flex-direction:column;gap:22px}
-.brand{display:flex;align-items:center;gap:10px;padding:0 8px;
-  font-weight:660;font-size:16px;letter-spacing:-.01em}
-nav{display:flex;flex-direction:column;gap:2px}
-nav a{display:flex;align-items:center;gap:10px;padding:9px 11px;
-  border-radius:9px;color:var(--ink-2);font-size:14px;font-weight:520}
+/* ---------- shell: a horizontal bar, not a sidebar ----------
+   Five destinations do not need a 216px column taking a fifth of the width
+   from the content on every page. */
+.shell{min-height:100vh;display:flex;flex-direction:column}
+.topbar{position:sticky;top:0;z-index:20;background:var(--card);
+  border-bottom:1px solid var(--line);
+  backdrop-filter:saturate(180%) blur(14px)}
+.topbar .in{max-width:1240px;margin:0 auto;padding:0 26px;height:60px;
+  display:flex;align-items:center;gap:20px}
+.brand{display:flex;align-items:center;gap:9px;font-weight:700;font-size:16.5px;
+  letter-spacing:-.022em;color:var(--ink);flex:none}
+.brand svg{width:20px;height:22px;flex:none}
+nav{display:flex;gap:3px;align-items:center;overflow-x:auto;
+  scrollbar-width:none}
+nav::-webkit-scrollbar{display:none}
+nav a{display:flex;align-items:center;gap:7px;padding:8px 13px;border-radius:8px;
+  color:var(--ink-2);font-size:14px;font-weight:540;white-space:nowrap;
+  line-height:1}
 nav a:hover{background:var(--raised);color:var(--ink);text-decoration:none}
 nav a[aria-current="page"]{background:var(--accent-soft);color:var(--accent-ink);
-  font-weight:620}
-nav a i{font-style:normal;opacity:.75;font-size:13px}
-.side-foot{margin-top:auto;padding:0 10px;font-size:12px;color:var(--muted);
-  line-height:1.7}
-main{flex:1;min-width:0;padding:26px 30px 60px;max-width:1160px}
+  font-weight:640}
+nav a i{font-style:normal;opacity:.7;font-size:12.5px}
+.bar-end{margin-left:auto;display:flex;align-items:center;gap:14px;flex:none}
+.bar-end .who{font-size:12.5px;color:var(--muted);white-space:nowrap}
+.bar-end a{font-size:12.5px;color:var(--ink-2)}
+.bar-end a:hover{color:var(--accent-ink)}
+main{flex:1;width:100%;max-width:1240px;margin:0 auto;padding:28px 26px 64px}
 
 /* ---------- page head ---------- */
 .phead{display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap;
@@ -231,17 +241,18 @@ summary:hover{color:var(--ink-2)}
   cursor:pointer}
 code{background:var(--raised);padding:2px 6px;border-radius:5px;font-size:12.5px}
 
-@media (max-width:820px){
-  .shell{flex-direction:column}
-  aside{width:auto;border-right:0;border-bottom:1px solid var(--line);
-    flex-direction:row;align-items:center;gap:14px;padding:12px 16px;
-    overflow-x:auto}
-  nav{flex-direction:row;gap:4px}
-  nav a span{display:none}
-  nav a{padding:8px 12px}
-  .side-foot{display:none}
-  main{padding:20px 16px 48px}
+@media (max-width:880px){
+  .topbar .in{height:auto;padding:11px 16px;flex-wrap:wrap;row-gap:9px}
+  .bar-end{margin-left:auto}
+  /* the nav takes the full second row and scrolls, instead of collapsing to
+     icons nobody can identify */
+  nav{order:3;width:100%;padding-bottom:1px}
+  main{padding:22px 16px 52px}
   .hero .v{font-size:42px}
+}
+@media (max-width:520px){
+  nav a span{font-size:13px}
+  .bar-end .who{display:none}
 }
 """
 
@@ -254,7 +265,13 @@ LOGO = (
 )
 
 
-def sidebar(active: str, dry_run: bool, user_label: str) -> str:
+def topbar(active: str, dry_run: bool, user_label: str) -> str:
+    """Horizontal navigation.
+
+    Five destinations do not justify a fixed column stealing a fifth of the
+    width on every page — and the pages that matter most (Activity, Usage) are
+    the widest, so they were the ones paying for it.
+    """
     links = "".join(
         f'<a href="{href}" aria-current="{"page" if href == active else "false"}">'
         f"<i>{icon}</i><span>{name}</span></a>"
@@ -265,13 +282,14 @@ def sidebar(active: str, dry_run: bool, user_label: str) -> str:
         else '<span class="pill live">Live</span>'
     )
     return (
-        f'<aside><div class="brand" style="color:var(--accent)">{LOGO}'
-        f'<span style="color:var(--ink)">Qalqon</span></div>'
+        f'<header class="topbar"><div class="in">'
+        f'<a class="brand" href="/"><span style="color:var(--accent)">{LOGO}</span>'
+        f'<span>Qalqon</span></a>'
         f"<nav>{links}</nav>"
-        f'<div class="side-foot">{mode}<br>{user_label}<br>'
-        f'<a href="/">Site</a> &middot; <a href="/privacy">Privacy</a>'
-        f' &middot; <a href="/logout">Sign out</a>'
-        f"</div></aside>"
+        f'<div class="bar-end">{mode}'
+        f'<span class="who">{user_label}</span>'
+        f'<a href="/logout">Sign out</a></div>'
+        f"</div></header>"
     )
 
 
