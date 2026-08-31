@@ -117,7 +117,7 @@ main{flex:1;width:100%;max-width:1240px;margin:0 auto;padding:28px 26px 64px}
 /* ---------- page head ---------- */
 .phead{display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap;
   margin-bottom:22px}
-.phead h1{font-size:22px;font-weight:660;letter-spacing:-.02em}
+.phead h1{font-size:clamp(19px,3.2vw,22px);font-weight:660;letter-spacing:-.02em}
 .phead p{margin:3px 0 0;color:var(--muted);font-size:13.5px}
 .pill{padding:4px 10px;border-radius:999px;font-size:11.5px;font-weight:640;
   letter-spacing:.02em;display:inline-block}
@@ -141,11 +141,11 @@ main{flex:1;width:100%;max-width:1240px;margin:0 auto;padding:28px 26px 64px}
   gap:14px;margin-bottom:26px}
 .tile{background:var(--card);border:1px solid var(--line);border-radius:14px;
   padding:17px 19px;box-shadow:var(--shadow)}
-.tile .v{font-size:28px;font-weight:680;letter-spacing:-.03em;line-height:1.1}
+.tile .v{font-size:clamp(23px,4.4vw,28px);font-weight:680;letter-spacing:-.03em;line-height:1.1}
 .tile .k{font-size:12.5px;color:var(--muted);margin-top:4px}
 .hero{display:flex;align-items:center;gap:22px;flex-wrap:wrap;
   padding:24px 26px;margin-bottom:14px}
-.hero .v{font-size:54px;font-weight:700;letter-spacing:-.045em;line-height:1;
+.hero .v{font-size:clamp(34px,7vw,54px);font-weight:700;letter-spacing:-.045em;line-height:1;
   color:var(--accent-ink)}
 .hero .k{font-size:14px;color:var(--ink-2);line-height:1.5}
 
@@ -165,7 +165,7 @@ main{flex:1;width:100%;max-width:1240px;margin:0 auto;padding:28px 26px 64px}
   border-radius:14px;padding:18px 20px;color:inherit;box-shadow:var(--shadow)}
 .gcard:hover{text-decoration:none;border-color:var(--accent);
   box-shadow:var(--shadow-lg)}
-.gname{font-size:16px;font-weight:640;letter-spacing:-.01em}
+.gname{font-size:16px;font-weight:640;letter-spacing:-.01em;overflow-wrap:anywhere}
 .gsub{font-size:12px;color:var(--muted);margin-top:2px}
 .gnums{display:flex;gap:20px;margin:15px 0 12px}
 .gnum b{display:block;font-size:23px;font-weight:680;letter-spacing:-.02em;
@@ -179,7 +179,7 @@ main{flex:1;width:100%;max-width:1240px;margin:0 auto;padding:28px 26px 64px}
 .item{display:flex;gap:14px;padding:16px 22px;
   border-bottom:1px solid var(--line-soft)}
 .item:last-child{border-bottom:0}
-.item .who{font-weight:600;font-size:14px}
+.item .who{font-weight:600;font-size:14px;display:flex;align-items:center;gap:7px;flex-wrap:wrap}
 .item .meta{font-size:12px;color:var(--muted);margin-top:3px}
 .item .said{font-size:13.5px;color:var(--ink-2);margin-top:9px;
   background:var(--raised);border-radius:9px;padding:9px 12px;
@@ -241,18 +241,58 @@ summary:hover{color:var(--ink-2)}
   cursor:pointer}
 code{background:var(--raised);padding:2px 6px;border-radius:5px;font-size:12.5px}
 
+@media (max-width:1080px){
+  .topbar .in,main{padding-left:20px;padding-right:20px}
+}
 @media (max-width:880px){
-  .topbar .in{height:auto;padding:11px 16px;flex-wrap:wrap;row-gap:9px}
+  .topbar .in{height:auto;padding:11px 20px;flex-wrap:wrap;row-gap:9px}
   .bar-end{margin-left:auto}
   /* the nav takes the full second row and scrolls, instead of collapsing to
      icons nobody can identify */
   nav{order:3;width:100%;padding-bottom:1px}
-  main{padding:22px 16px 52px}
-  .hero .v{font-size:42px}
+  main{padding:22px 20px 52px}
 }
-@media (max-width:520px){
-  nav a span{font-size:13px}
+
+/* Below this the layout stops being a scaled-down desktop: the grids re-flow
+   to two columns rather than one tall stack, and the chart starts to scroll.
+   An SVG with a fixed viewBox shrinks its TEXT along with its bars, so a chart
+   that merely fits a phone has axis labels around 5px tall. Better to keep the
+   type legible and let the plot scroll under the finger. */
+@media (max-width:720px){
+  .tiles{grid-template-columns:repeat(auto-fit,minmax(136px,1fr));gap:10px;
+    margin-bottom:20px}
+  .tile{padding:14px 15px;border-radius:12px}
+  .gcards{grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px}
+  .gcard{padding:15px 16px}
+  .gnums{gap:16px;margin:12px 0 10px}
+  .hero{padding:18px 20px;gap:16px}
+  .pad{padding:16px 17px;overflow-x:auto}
+  .chart{min-width:520px}
+  .legend{gap:14px;margin-bottom:13px}
+  th{padding:10px 13px}
+  td{padding:11px 13px}
+  .empty{padding:40px 20px}
+}
+
+/* Phones. The feed row is the piece that genuinely breaks: a timestamp pinned
+   right by margin-left:auto squeezes the message it belongs to down to a few
+   characters per line, so it drops to its own line instead. */
+@media (max-width:560px){
+  .topbar .in,main{padding-left:14px;padding-right:14px}
+  main{padding-bottom:44px}
+  .item{padding:14px 16px;flex-wrap:wrap}
+  .item .when{margin-left:0;padding-left:0;width:100%;margin-top:9px}
+  .filters{gap:6px;margin-bottom:16px}
+  .chip{padding:5px 11px;font-size:12.5px}
+  .phead{gap:10px;margin-bottom:18px}
+  .login{margin:7vh auto}
+  .login .card{padding:26px 20px}
+}
+@media (max-width:430px){
   .bar-end .who{display:none}
+  .tiles{grid-template-columns:1fr 1fr}
+  .brand{font-size:15.5px}
+  nav a{padding:7px 11px}
 }
 """
 

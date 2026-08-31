@@ -4,6 +4,7 @@ This is the only thing standing between the open internet and every moderation
 record — including real users' message text. Anyone can POST anything to the
 callback URL, so each check below is load-bearing and gets its own test.
 """
+import re
 import hashlib
 import hmac
 import time
@@ -321,3 +322,17 @@ def test_the_dashboard_navigation_is_horizontal():
         body = client.get("/app").text
     assert 'class="topbar"' in body
     assert "<aside" not in body
+
+
+def test_the_layout_reflows_rather_than_only_shrinking():
+    """A fixed-viewBox SVG scales its text down with its bars, so a chart that
+    merely fits a phone is unreadable; and one-column tiles make a five-tile
+    row taller than the screen. Both need explicit rules, not just max-width."""
+    from web import render
+
+    css = render.CSS
+    assert ".chart{min-width:520px}" in css, "chart would shrink its own labels"
+    assert "grid-template-columns:1fr 1fr" in css, "tiles collapse to one column"
+    assert ".item .when{margin-left:0" in css, "timestamp still steals the row"
+    breakpoints = sorted({int(w) for w in re.findall(r"max-width:(\d+)px", css)})
+    assert len(breakpoints) >= 4, f"too few breakpoints: {breakpoints}"
