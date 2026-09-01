@@ -351,3 +351,30 @@ def test_the_landing_page_test_count_is_not_stale(request):
     assert f"<b>{collected}</b><span>automated tests</span>" in html, (
         f"the landing page states a different number; the suite has {collected}"
     )
+
+
+def test_the_two_stylesheets_do_not_define_the_same_class():
+    """render.CSS and landing.CSS are both served on every page, so a class
+    named in both silently applies the wrong rules to the wrong element.
+
+    This is not hypothetical: the landing hero was `class="hero"`, and the
+    dashboard's `.hero` card rule (display:flex; align-items:center) turned the
+    eyebrow, headline, paragraph, buttons and stats into five flex items in one
+    row. The landing's `.note` captions were separately picking up the
+    dashboard's amber warning background.
+    """
+    import re
+
+    from web import landing, render
+
+    def unscoped(css):
+        found = set()
+        for selector in re.findall(r"^([.#][^{@]*)\{", css, re.M):
+            for part in selector.split(","):
+                part = part.strip()
+                if re.fullmatch(r"\.[a-zA-Z][\w-]*", part):
+                    found.add(part)
+        return found
+
+    shared = unscoped(render.CSS) & unscoped(landing.CSS)
+    assert not shared, f"defined in both stylesheets: {sorted(shared)}"

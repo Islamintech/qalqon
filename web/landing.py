@@ -11,6 +11,8 @@ should appear. Every number here is a property of the software, not of anyone's
 conversation.
 """
 
+from . import render
+
 CSS = """
 .lp{--max:1100px}
 .lp a{text-decoration:none}
@@ -48,7 +50,11 @@ CSS = """
 .eyebrow{font-size:11.5px;font-weight:700;letter-spacing:.12em;
   text-transform:uppercase;color:var(--accent);margin-bottom:14px}
 
-/* ---------- hero: centred, so the headline is not marooned on the left --- */
+/* ---------- hero: centred, so the headline is not marooned on the left ---
+   Named lp-hero, not hero: render.CSS ships a .hero for the dashboard's hero
+   CARD (display:flex; align-items:center), and both stylesheets are on every
+   page. Under that rule the eyebrow, headline, paragraph, buttons and stats
+   became five flex items in one vertically-centred row. */
 .hero-wrap{position:relative;overflow:hidden;border-bottom:1px solid var(--line);
   background:
     radial-gradient(880px 420px at 50% -12%,
@@ -56,14 +62,14 @@ CSS = """
     radial-gradient(620px 300px at 88% 8%,
       color-mix(in srgb, var(--review) 8%, transparent), transparent 68%)}
 .hero-in{max-width:820px;margin:0 auto;padding:104px 28px 92px;text-align:center}
-.hero h1{font-size:clamp(35px,5.6vw,58px);font-weight:730;letter-spacing:-.042em;
+.lp-hero h1{font-size:clamp(35px,5.6vw,58px);font-weight:730;letter-spacing:-.042em;
   line-height:1.05;margin:0 auto;max-width:17ch}
-.hero h1 em{font-style:normal;color:var(--accent)}
-.hero p{margin:24px auto 0;font-size:18px;line-height:1.62;color:var(--ink-2);
+.lp-hero h1 em{font-style:normal;color:var(--accent)}
+.lp-hero p{margin:24px auto 0;font-size:18px;line-height:1.62;color:var(--ink-2);
   max-width:54ch}
-.hero .row{display:flex;gap:12px;margin-top:34px;flex-wrap:wrap;
+.lp-hero .row{display:flex;gap:12px;margin-top:34px;flex-wrap:wrap;
   justify-content:center}
-.hero .facts{display:flex;justify-content:center;margin-top:58px;flex-wrap:wrap}
+.lp-hero .facts{display:flex;justify-content:center;margin-top:58px;flex-wrap:wrap}
 .fact{padding:0 30px;border-left:1px solid var(--line);text-align:center}
 .fact:first-child{border-left:0}
 .fact b{display:block;font-size:27px;font-weight:710;letter-spacing:-.03em;
@@ -79,18 +85,18 @@ CSS = """
   padding:26px;box-shadow:var(--shadow);display:flex;flex-direction:column}
 .box h3{font-size:16px;font-weight:660;margin-bottom:9px;letter-spacing:-.012em}
 .box p{margin:0;font-size:14px;line-height:1.68;color:var(--ink-2)}
-.box .ico{font-size:21px;margin-bottom:15px;display:block;line-height:1}
+.box .ico{display:block;margin-bottom:15px;line-height:0;color:var(--accent)}
 
 /* ---------- the two example messages ---------- */
 .msg{border-radius:14px;padding:20px 22px;border:1px solid var(--line);
   background:var(--card);box-shadow:var(--shadow);display:flex;
   flex-direction:column}
-.msg .tag{font-size:11px;font-weight:700;letter-spacing:.06em;
+.msg .tag{display:inline-flex;align-items:center;gap:7px;font-size:11px;font-weight:700;letter-spacing:.06em;
   text-transform:uppercase;display:block;margin-bottom:12px}
 .msg.ok .tag{color:var(--good)}
 .msg.bad .tag{color:var(--ban)}
 .msg .txt{color:var(--ink);font-size:15px;line-height:1.6}
-.msg .note{margin-top:auto;padding-top:14px;font-size:12.5px;color:var(--muted);
+.msg .cap{margin-top:auto;padding-top:14px;font-size:12.5px;color:var(--muted);
   border-top:1px solid var(--line-soft);line-height:1.6}
 .punch{max-width:660px;margin:28px auto 0;text-align:center;font-size:16px;
   line-height:1.7;color:var(--ink-2)}
@@ -138,7 +144,7 @@ CSS = """
   .hero-in{padding:64px 20px 56px}
   .g2,.g3{grid-template-columns:minmax(0,1fr)}
   .lp-foot .in{grid-template-columns:1fr;gap:26px;padding:38px 20px 30px}
-  .hero .facts{gap:22px 0}
+  .lp-hero .facts{gap:22px 0}
   .fact{flex:1 0 45%;border-left:0;padding:0}
 }
 """
@@ -255,7 +261,7 @@ def page(logo: str, signed_in: bool) -> str:
   <div class="lp-cta">{cta}</div>
 </div></header>
 
-<div class="hero-wrap"><div class="hero-in hero">
+<div class="hero-wrap"><div class="hero-in lp-hero">
   <div class="eyebrow">Telegram moderation</div>
   <h1>Scammers move faster than <em>moderators</em>.</h1>
   <p>Qalqon watches Telegram groups for fraud — advance-fee scams, fake
@@ -268,7 +274,7 @@ def page(logo: str, signed_in: bool) -> str:
   <div class="facts">
     <div class="fact"><b>6</b><span>independent signals</span></div>
     <div class="fact"><b>∞</b><span>languages</span></div>
-    <div class="fact"><b>351</b><span>automated tests</span></div>
+    <div class="fact"><b>352</b><span>automated tests</span></div>
     <div class="fact"><b>&lt;1s</b><span>typical decision</span></div>
   </div>
 </div></div>
@@ -285,15 +291,15 @@ def page(logo: str, signed_in: bool) -> str:
     banned two of them outright.</p>
   </div>
   <div class="grid g2">
-    <div class="msg ok"><span class="tag">✓ Left alone</span>
+    <div class="msg ok"><span class="tag">{render.icon("check", 12)}Left alone</span>
       <div class="txt">“Anyone got a spare shift tomorrow? Happy to cover it —
       message me”</div>
-      <div class="note">Every keyword here appears in scams too. Nothing is
+      <div class="cap">Every keyword here appears in scams too. Nothing is
       being asked of anyone, so nothing happens.</div></div>
-    <div class="msg bad"><span class="tag">✕ Removed</span>
+    <div class="msg bad"><span class="tag">{render.icon("ban", 12)}Removed</span>
       <div class="txt">“I can get you the job — just send the 300 deposit
       first and I'll confirm today”</div>
-      <div class="note">Same subject, same tone. But money is demanded before
+      <div class="cap">Same subject, same tone. But money is demanded before
       anything is delivered.</div></div>
   </div>
   <p class="punch"><b>The topic is never the signal.</b> What separates the two
@@ -314,15 +320,15 @@ def page(logo: str, signed_in: bool) -> str:
   </div>
   <div class="pipe">{_pipeline()}</div>
   <div class="grid g3">
-    <div class="box"><span class="ico">🧠</span><h3>Context-aware</h3>
+    <div class="box"><span class="ico">{render.icon("context", 21)}</span><h3>Context-aware</h3>
       <p>The model is told what is normal for the community it guards, so a
       job post quoting a daily rate reads as recruitment rather than an
       earnings promise.</p></div>
-    <div class="box"><span class="ico">🔗</span><h3>Structural link checks</h3>
+    <div class="box"><span class="ico">{render.icon("link", 21)}</span><h3>Structural link checks</h3>
       <p>Homographs, typosquats, credentials-in-URL and buried double
       extensions. Nothing is ever fetched — following a stranger's link would
       hand them an SSRF probe.</p></div>
-    <div class="box"><span class="ico">⏱️</span><h3>Memory that forgives</h3>
+    <div class="box"><span class="ico">{render.icon("clock", 21)}</span><h3>Memory that forgives</h3>
       <p>Repeat offenders escalate; strikes expire, so one bad week does not
       follow someone forever. Long-standing members can never be banned
       automatically.</p></div>
@@ -337,25 +343,25 @@ def page(logo: str, signed_in: bool) -> str:
     is removing a real member — and doing it invisibly.</p>
   </div>
   <div class="grid g3">
-    <div class="box"><span class="ico">👥</span><h3>Two signals to act</h3>
+    <div class="box"><span class="ico">{render.icon("people", 21)}</span><h3>Two signals to act</h3>
       <p>A suspicious message alone is not enough. The sender's profile has to
       agree before anyone is removed; a lone red flag goes to a human
       instead.</p></div>
-    <div class="box"><span class="ico">🛟</span><h3>Dry run by default</h3>
+    <div class="box"><span class="ico">{render.icon("buoy", 21)}</span><h3>Dry run by default</h3>
       <p>New deployments report what they would do without touching anything,
       so the thresholds can be judged against real traffic before they are
       trusted.</p></div>
-    <div class="box"><span class="ico">📣</span><h3>Failure is loud</h3>
+    <div class="box"><span class="ico">{render.icon("megaphone", 21)}</span><h3>Failure is loud</h3>
       <p>If a detector cannot run, the verdict is marked degraded and admins
       are told. A screening step that quietly stops working is worse than one
       switched off.</p></div>
-    <div class="box"><span class="ico">↩️</span><h3>One-tap reversal</h3>
+    <div class="box"><span class="ico">{render.icon("undo", 21)}</span><h3>One-tap reversal</h3>
       <p>Every alert carries Ban, Ignore and Trust buttons. Marking a decision
       wrong clears the strike behind it, so a mistake cannot compound.</p></div>
-    <div class="box"><span class="ico">🔒</span><h3>Privacy by retention</h3>
+    <div class="box"><span class="ico">{render.icon("lock", 21)}</span><h3>Privacy by retention</h3>
       <p>Ordinary conversation is never stored. Only messages that were acted
       on are kept, and only for 90 days.</p></div>
-    <div class="box"><span class="ico">📊</span><h3>Measured, not assumed</h3>
+    <div class="box"><span class="ico">{render.icon("bars", 21)}</span><h3>Measured, not assumed</h3>
       <p>Admin decisions are recorded as ground truth, so the false-positive
       rate is a number on a dashboard rather than a feeling.</p></div>
   </div>
@@ -379,7 +385,7 @@ def page(logo: str, signed_in: bool) -> str:
     <span class="tech">FastAPI</span>
     <span class="tech">SQLite · WAL</span>
     <span class="tech">Docker</span>
-    <span class="tech">pytest · 351 tests</span>
+    <span class="tech">pytest · 352 tests</span>
     <span class="tech">nginx · Let's Encrypt</span>
   </div>
   <div class="grid g3">
