@@ -90,10 +90,6 @@ PATHS = {
     "lock": '<rect x="3" y="7" width="10" height="6.4" rx="1.6"/>'
             '<path d="M5.4 7V5.2a2.6 2.6 0 0 1 5.2 0V7"/>',
     # --- theme switch ------------------------------------------------------
-    "auto": '<circle cx="8" cy="8" r="5.6"/>'
-            '<path d="M8 2.4v11.2" stroke-width="1.2"/>'
-            '<path d="M8 3.6a4.4 4.4 0 0 1 0 8.8Z" fill="currentColor" '
-            'stroke="none"/>',
     "sun": '<circle cx="8" cy="8" r="2.9"/>'
            '<path d="M8 1.6v1.5M8 12.9v1.5M14.4 8h-1.5M3.1 8H1.6'
            'M12.5 3.5l-1 1M4.5 11.5l-1 1M12.5 12.5l-1-1M4.5 4.5l-1-1"/>',
@@ -204,7 +200,16 @@ nav a .ic{opacity:.75;flex:none}
 /* The selected segment is tinted, not merely a different surface: against the
    dark track, --card is DARKER than --raised, so a surface swap read as an
    inset hole rather than a selection. */
-.theme .seg.on{background:var(--accent-soft);color:var(--accent-ink)}
+.theme .seg.on,
+.theme.auto .seg.light,
+.theme.auto .seg.dark{background:var(--accent-soft);color:var(--accent-ink)}
+/* Nothing chosen yet: the OS decides which one is actually showing, so let the
+   same media query that picks the palette pick the highlight. */
+.theme.auto .seg.dark{background:none;color:var(--muted)}
+@media (prefers-color-scheme:dark){
+  .theme.auto .seg.light{background:none;color:var(--muted)}
+  .theme.auto .seg.dark{background:var(--accent-soft);color:var(--accent-ink)}
+}
 .bar-end a{font-size:12.5px;color:var(--ink-2)}
 .bar-end a:hover{color:var(--accent-ink)}
 main{flex:1;width:100%;max-width:1240px;margin:0 auto;padding:28px 26px 64px}
@@ -455,27 +460,31 @@ def topbar(active: str, dry_run: bool, user_label: str,
     )
 
 
-THEMES = [("auto", "auto", "Match my system"),
-          ("light", "sun", "Light"),
-          ("dark", "moon", "Dark")]
+THEMES = [("light", "sun", "Light"), ("dark", "moon", "Dark")]
 
 
 def theme_switch(current: str, here: str) -> str:
-    """Three states, not two.
+    """Light or dark.
 
-    A two-way toggle silently makes a choice on the reader's behalf the first
-    time they touch it, and gives them no way back to "whatever my system
-    says" — which is the setting most people actually want.
+    Until the reader picks one, the page still follows the operating system —
+    and the server cannot read a media query, so it does not know which of the
+    two is on screen. When nothing has been chosen the switch is marked `auto`
+    and the CSS highlights whichever segment matches the OS, which keeps the
+    control honest on a first visit without any script.
     """
+    auto = "" if current else " auto"
     links = "".join(
-        f'<a href="/theme?v={value}&amp;next={here}" class="seg'
-        f'{" on" if value == (current or "auto") else ""}" '
+        f'<a href="/theme?v={value}&amp;next={here}" '
+        f'class="seg {value}{" on" if value == current else ""}" '
         f'title="{title}" aria-label="{title}" '
-        f'aria-current="{"true" if value == (current or "auto") else "false"}">'
+        f'aria-current="{"true" if value == current else "false"}">'
         f"{icon(key, 13)}</a>"
         for value, key, title in THEMES
     )
-    return f'<div class="theme" role="group" aria-label="Colour theme">{links}</div>'
+    return (
+        f'<div class="theme{auto}" role="group" aria-label="Colour theme">'
+        f"{links}</div>"
+    )
 
 
 def empty(glyph: str, title: str, body: str, hint: str = "") -> str:

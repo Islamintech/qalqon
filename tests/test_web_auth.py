@@ -410,10 +410,12 @@ def test_choosing_a_theme_stamps_it_on_the_page(choice):
     assert f'<html lang=en data-theme="{choice}">' in r.text
 
 
-def test_returning_to_auto_clears_the_choice():
+def test_an_unrecognised_value_clears_the_choice():
+    """There is no longer a control for it, but the route still falls back to
+    the operating system rather than storing something meaningless."""
     with _client() as client:
         client.get("/theme?v=dark&next=/", follow_redirects=False)
-        client.get("/theme?v=auto&next=/", follow_redirects=False)
+        client.get("/theme?v=sepia&next=/", follow_redirects=False)
         r = client.get("/")
     assert "data-theme" not in _html_tag(r.text)
 
@@ -437,14 +439,25 @@ def test_the_theme_switch_cannot_be_used_as_an_open_redirect(hostile):
     assert r.headers["location"] == "/"
 
 
-def test_the_switch_offers_all_three_states_and_marks_the_current_one():
+def test_the_switch_offers_light_and_dark_and_marks_the_current_one():
     from web import render
 
     html = render.theme_switch("dark", "/activity")
-    for value in ("auto", "light", "dark"):
-        assert f"/theme?v={value}" in html
+    assert "/theme?v=light" in html and "/theme?v=dark" in html
+    assert "/theme?v=auto" not in html
     assert html.count('aria-current="true"') == 1
     assert 'href="/theme?v=dark&amp;next=/activity"' in html
+
+
+def test_before_a_choice_is_made_the_css_marks_the_current_one():
+    """The server cannot read a media query, so with no cookie it does not know
+    which palette is on screen; the switch defers to CSS instead of guessing."""
+    from web import render
+
+    html = render.theme_switch("", "/app")
+    assert 'class="theme auto"' in html
+    assert "on" not in html.split("<a")[0]
+    assert ".theme.auto .seg.dark{background:var(--accent-soft)" in render.CSS
 
 
 def test_both_palettes_define_every_token():
