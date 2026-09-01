@@ -469,3 +469,42 @@ def test_both_palettes_define_every_token():
 
     names = lambda block: set(re.findall(r"(--[\w-]+):", block))
     assert names(render.LIGHT) == names(render.DARK)
+
+
+# --- the mark ---------------------------------------------------------------
+
+def test_the_favicon_is_served_and_stands_alone():
+    """A tab icon never sees the stylesheet, so it cannot use theme tokens."""
+    r = _client().get("/favicon.svg")
+    assert r.status_code == 200
+    assert r.headers["content-type"].startswith("image/svg+xml")
+    assert "var(--" not in r.text, "a CSS variable would render as no colour"
+    assert "xmlns" in r.text, "a standalone SVG needs its namespace"
+
+
+def test_every_page_points_at_the_favicon():
+    from web import render
+
+    with _signed_in_client() as client:
+        pages = [client.get(p).text for p in ("/app", "/activity")]
+    pages.append(_client().get("/").text)
+    for html in pages:
+        assert '<link rel="icon" type="image/svg+xml" href="/favicon.svg">' in html
+    assert "class=\"mark\"" in render.LOGO
+
+
+def test_the_mark_is_never_stretched():
+    """One glyph, one aspect ratio: the SVG carries no width/height of its own
+    and both headers size it by height with width:auto."""
+    import re
+
+    from web import landing, render
+
+    assert "width=" not in render.LOGO.split(">")[0]
+    assert "height=" not in render.LOGO.split(">")[0]
+    for css, selector in ((render.CSS, ".brand .mark"),
+                          (landing.CSS, ".lp-brand .mark")):
+        rule = re.search(re.escape(selector) + r"\{([^}]*)\}", css)
+        assert rule, selector
+        assert "width:auto" in rule.group(1), selector
+        assert re.search(r"height:\d+px", rule.group(1)), selector

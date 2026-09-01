@@ -26,7 +26,7 @@ CSS = """
   display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:16px}
 .lp-brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:18px;
   letter-spacing:-.025em;color:var(--ink);justify-self:start}
-.lp-brand svg{width:22px;height:24px;flex:none}
+.lp-brand .mark{height:24px;width:auto;flex:none;color:var(--accent)}
 .lp-nav{display:flex;gap:4px;align-items:center;justify-self:center}
 .lp-nav a{color:var(--ink-2);font-size:14px;font-weight:540;padding:8px 14px;
   border-radius:8px;line-height:1;white-space:nowrap}
@@ -252,7 +252,7 @@ def page(logo: str, signed_in: bool, theme: str = "",
     return f"""
 <div class="lp">
 <header class="lp-head"><div class="in">
-  <a class="lp-brand" href="/"><span style="color:var(--accent)">{logo}</span>Qalqon</a>
+  <a class="lp-brand" href="/">{logo}Qalqon</a>
   <nav class="lp-nav">
     <a href="#problem">The problem</a>
     <a href="#how">How it works</a>
@@ -275,7 +275,7 @@ def page(logo: str, signed_in: bool, theme: str = "",
   <div class="facts">
     <div class="fact"><b>6</b><span>independent signals</span></div>
     <div class="fact"><b>∞</b><span>languages</span></div>
-    <div class="fact"><b>363</b><span>automated tests</span></div>
+    <div class="fact"><b>366</b><span>automated tests</span></div>
     <div class="fact"><b>&lt;1s</b><span>typical decision</span></div>
   </div>
 </div></div>
@@ -386,7 +386,7 @@ def page(logo: str, signed_in: bool, theme: str = "",
     <span class="tech">FastAPI</span>
     <span class="tech">SQLite · WAL</span>
     <span class="tech">Docker</span>
-    <span class="tech">pytest · 363 tests</span>
+    <span class="tech">pytest · 366 tests</span>
     <span class="tech">nginx · Let's Encrypt</span>
   </div>
   <div class="grid g3">
@@ -405,8 +405,7 @@ def page(logo: str, signed_in: bool, theme: str = "",
 <footer class="lp-foot">
   <div class="in">
     <div class="col">
-      <a class="lp-brand" href="/" style="margin-bottom:12px">
-        <span style="color:var(--accent)">{logo}</span>Qalqon</a>
+      <a class="lp-brand" href="/" style="margin-bottom:12px">{logo}Qalqon</a>
       <p style="color:var(--muted)">Anti-scam moderation for Telegram
       communities.</p>
     </div>

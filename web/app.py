@@ -25,7 +25,7 @@ from datetime import datetime, timezone
 from urllib.parse import quote
 
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -163,6 +163,9 @@ def _document(inner: str, extra_css: str = "", public: bool = False) -> HTMLResp
         f"<!doctype html><html lang=en{theme_attr}>"
         "<head><meta charset=utf-8>"
         "<meta name=viewport content='width=device-width,initial-scale=1'>"
+        '<link rel="icon" type="image/svg+xml" href="/favicon.svg">'
+        '<link rel="mask-icon" href="/favicon.svg" color="#3987e5">'
+        "<meta name='theme-color' content='#3987e5'>"
         f"<meta name=robots content='{robots}'>"
         f'<meta name="description" content="{desc}">'
         '<meta property="og:title" content="Qalqon — anti-scam moderation for Telegram">'
@@ -479,6 +482,17 @@ Hugging Face. To request deletion, contact your group admin.</p>
 </section>
 </div></main>"""
     return page(body, _current_user(request))
+
+
+@app.get("/favicon.svg")
+async def favicon():
+    """The mark, standalone. An SVG icon cannot reach the stylesheet, so its
+    two colours are literal rather than theme tokens."""
+    return Response(
+        render.FAVICON,
+        media_type="image/svg+xml",
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
 
 
 @app.get("/healthz")

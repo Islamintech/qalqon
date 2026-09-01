@@ -178,7 +178,7 @@ h1,h2,h3{margin:0}
   display:flex;align-items:center;gap:20px}
 .brand{display:flex;align-items:center;gap:9px;font-weight:700;font-size:16.5px;
   letter-spacing:-.022em;color:var(--ink);flex:none}
-.brand svg{width:20px;height:22px;flex:none}
+.brand .mark{height:22px;width:auto;flex:none;color:var(--accent)}
 nav{display:flex;gap:3px;align-items:center;overflow-x:auto;
   scrollbar-width:none}
 nav::-webkit-scrollbar{display:none}
@@ -421,12 +421,33 @@ code{background:var(--raised);padding:2px 6px;border-radius:5px;font-size:12.5px
 }
 """
 
+# The mark: a shield with a check knocked out of it.
+#
+# Sized by HEIGHT alone, with width:auto in the CSS. It used to carry
+# width="21" height="23" against a 0 0 20 22 viewBox, and the two headers then
+# overrode that to 20x22 and 22x24 — three different aspect ratios for one
+# glyph, so the shield was quietly stretched on the landing page.
+SHIELD = (
+    '<path d="M10 1 18.2 4v7.1c0 4.6-3.3 8.2-8.2 9.9-4.9-1.7-8.2-5.3-8.2-9.9'
+    'V4L10 1Z" fill="currentColor"/>'
+    '<path d="m6.4 10.9 2.5 2.5 4.9-4.9" stroke="{knockout}" '
+    'stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" '
+    'fill="none"/>'
+)
+
 LOGO = (
-    '<svg width="21" height="23" viewBox="0 0 20 22" fill="none" '
-    'aria-hidden="true"><path d="M10 1 18.2 4v7.1c0 4.6-3.3 8.2-8.2 9.9'
-    '-4.9-1.7-8.2-5.3-8.2-9.9V4L10 1Z" fill="currentColor"/>'
-    '<path d="m6.4 10.9 2.5 2.5 4.9-4.9" stroke="var(--card)" '
-    'stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+    '<svg class="mark" viewBox="0 0 20 22" fill="none" aria-hidden="true">'
+    + SHIELD.format(knockout="var(--card)")
+    + "</svg>"
+)
+
+# Standalone copy for the browser tab: no stylesheet reaches it, so the two
+# colours are literal. White holds up on both a light and a dark tab strip.
+FAVICON = (
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 22">'
+    + SHIELD.format(knockout="#ffffff").replace(
+        'fill="currentColor"', 'fill="#3987e5"')
+    + "</svg>"
 )
 
 
@@ -449,8 +470,7 @@ def topbar(active: str, dry_run: bool, user_label: str,
     )
     return (
         f'<header class="topbar"><div class="in">'
-        f'<a class="brand" href="/"><span style="color:var(--accent)">{LOGO}</span>'
-        f'<span>Qalqon</span></a>'
+        f'<a class="brand" href="/">{LOGO}<span>Qalqon</span></a>'
         f"<nav>{links}</nav>"
         f'<div class="bar-end">{mode}'
         f"{theme_switch(theme, here)}"
