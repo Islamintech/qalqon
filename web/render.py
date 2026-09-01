@@ -32,24 +32,65 @@ SERIES = {"REVIEW": "#2a78d6", "DELETE": "#eda100", "BAN": "#e34948"}
 SERIES_DARK = {"REVIEW": "#3987e5", "DELETE": "#c98500", "BAN": "#d55181"}
 SERIES_ORDER = ["BAN", "DELETE", "REVIEW"]
 
-# What each action is called in the interface, and its icon.
+# What each action is called in the interface, and which icon draws it.
+#
+# These were emoji. Emoji are a different typeface on every platform — the same
+# chip rendered as a flat glyph here and a colour cartoon there, at a size the
+# CSS could not control — and they carry no stroke, so they never matched the
+# weight of the text beside them. Drawn icons scale and recolour with the chip.
 LABEL = {
-    "BAN": ("Member removed", "🚫"),
-    "DELETE": ("Message deleted", "🧹"),
-    "REVIEW": ("Needs review", "⚠️"),
-    "ADMIN_BAN": ("You banned", "🚫"),
-    "ADMIN_UNBAN": ("You unbanned", "♻️"),
-    "ADMIN_IGNORE": ("You marked it a mistake", "👌"),
-    "ADMIN_WHITELIST": ("You trusted", "✅"),
+    "BAN": ("Member removed", "ban"),
+    "DELETE": ("Message deleted", "broom"),
+    "REVIEW": ("Needs review", "warn"),
+    "ADMIN_BAN": ("You banned", "ban"),
+    "ADMIN_UNBAN": ("You unbanned", "undo"),
+    "ADMIN_IGNORE": ("You marked it a mistake", "undo"),
+    "ADMIN_WHITELIST": ("You trusted", "check"),
 }
+
+# One stroke style throughout: 16-unit box, 1.4 stroke, round caps, no fills,
+# so every icon inherits the colour and optical weight of its context.
+PATHS = {
+    "grid": '<rect x="2" y="2" width="5" height="5" rx="1"/>'
+            '<rect x="9" y="2" width="5" height="5" rx="1"/>'
+            '<rect x="2" y="9" width="5" height="5" rx="1"/>'
+            '<rect x="9" y="9" width="5" height="5" rx="1"/>',
+    "groups": '<circle cx="6" cy="6" r="2.6"/><circle cx="11" cy="10" r="2.6"/>'
+              '<path d="M7.7 7.9 9.3 8.6"/>',
+    "member": '<circle cx="8" cy="5.5" r="2.6"/>'
+              '<path d="M3 13.2c.7-2.3 2.6-3.5 5-3.5s4.3 1.2 5 3.5"/>',
+    "clock": '<circle cx="8" cy="8" r="5.8"/><path d="M8 4.6V8l2.4 1.6"/>',
+    "bars": '<path d="M2.5 13V7.5M6.2 13V3.5M9.8 13V9.5M13.5 13V6"/>',
+    "ban": '<circle cx="8" cy="8" r="5.6"/><path d="M4 4l8 8"/>',
+    "broom": '<path d="M3 13h10M5 4h6M5.6 4l-.8 9M10.4 4l.8 9"/>',
+    "warn": '<path d="M8 2.6 14.2 13H1.8L8 2.6Z"/><path d="M8 6.6v2.6M8 11h.01"/>',
+    "check": '<path d="M3.4 8.4 6.6 11.6l6-6.4"/>',
+    "undo": '<path d="M3 8a5 5 0 1 0 1.6-3.7"/><path d="M2.6 3v3.2h3.2"/>',
+    "shield": '<path d="M8 2 13 3.9v4.4c0 2.9-2 5.1-5 6.2-3-1.1-5-3.3-5-6.2V3.9L8 2Z"/>'
+              '<path d="M5.9 8.1 7.4 9.6l3-3"/>',
+    "quiet": '<circle cx="8" cy="8" r="5.8"/><path d="M5.4 8h5.2"/>',
+}
+
+
+def icon(name: str, size: float = 14) -> str:
+    """An inline SVG icon. Unknown names draw nothing rather than a tofu box."""
+    path = PATHS.get(name)
+    if not path:
+        return ""
+    return (
+        f'<svg class="ic" width="{size}" height="{size}" viewBox="0 0 16 16" '
+        f'fill="none" stroke="currentColor" stroke-width="1.4" '
+        f'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+        f"{path}</svg>"
+    )
 PLURAL = {"BAN": "removed", "DELETE": "deleted", "REVIEW": "to review"}
 
 NAV = [
-    ("/app", "Overview", "▦"),
-    ("/groups", "Groups", "◍"),
-    ("/members", "Members", "◎"),
-    ("/activity", "Activity", "◔"),
-    ("/usage", "Usage", "◑"),
+    ("/app", "Overview", "grid"),
+    ("/groups", "Groups", "groups"),
+    ("/members", "Members", "member"),
+    ("/activity", "Activity", "clock"),
+    ("/usage", "Usage", "bars"),
 ]
 
 CSS = """
@@ -107,7 +148,8 @@ nav a{display:flex;align-items:center;gap:7px;padding:8px 13px;border-radius:8px
 nav a:hover{background:var(--raised);color:var(--ink);text-decoration:none}
 nav a[aria-current="page"]{background:var(--accent-soft);color:var(--accent-ink);
   font-weight:640}
-nav a i{font-style:normal;opacity:.7;font-size:12.5px}
+nav a .ic{opacity:.75;flex:none}
+.act .ic,.empty .ic{flex:none}
 .bar-end{margin-left:auto;display:flex;align-items:center;gap:14px;flex:none}
 .bar-end .who{font-size:12.5px;color:var(--muted);white-space:nowrap}
 .bar-end a{font-size:12.5px;color:var(--ink-2)}
@@ -223,7 +265,7 @@ tbody tr:hover td{background:var(--raised)}
 
 /* ---------- empty states ---------- */
 .empty{padding:54px 28px;text-align:center}
-.empty .icon{font-size:30px;opacity:.5}
+.empty .icon{color:var(--muted);opacity:.75;line-height:0}
 .empty h3{font-size:16px;font-weight:620;margin:14px 0 6px}
 .empty p{margin:0 auto;max-width:430px;color:var(--muted);font-size:13.5px;
   line-height:1.6}
@@ -236,8 +278,12 @@ tbody tr:hover td{background:var(--raised)}
 details{margin-top:9px}
 summary{display:inline-flex;align-items:center;gap:5px;
   padding:3px 9px;border-radius:7px;background:var(--raised)}
-summary::before{content:"▸";font-size:9px;opacity:.7}
-details[open] summary::before{content:"▾"}
+/* A glyph triangle renders as a smudge at this size and sits off the
+   baseline; borders draw a crisp one that inherits the text colour. */
+summary::before{content:"";width:0;height:0;border:4px solid transparent;
+  border-left:5px solid currentColor;opacity:.75}
+details[open] summary::before{border:4px solid transparent;
+  border-top:5px solid currentColor;margin-top:4px}
 summary{cursor:pointer;font-size:12.5px;color:var(--muted);list-style:none}
 summary::-webkit-details-marker{display:none}
 summary:hover{color:var(--ink-2)}
@@ -247,6 +293,12 @@ summary:hover{color:var(--ink-2)}
 .login .card{padding:32px 28px}
 .login h1{font-size:21px;margin-bottom:6px}
 .login p{color:var(--muted);font-size:13.5px;margin:0 0 20px}
+.login .foot{margin:18px 0 0;font-size:12.5px;line-height:1.65}
+.or{display:flex;align-items:center;gap:12px;margin:22px 0 18px}
+.or::before,.or::after{content:"";flex:1;height:1px;background:var(--line)}
+.or span{font-size:12px;color:var(--muted)}
+.lbl{display:block;text-align:left;font-size:12.5px;color:var(--ink-2);
+  margin-bottom:7px}
 .field{width:100%;padding:11px 13px;border-radius:10px;
   border:1px solid var(--line);background:var(--page);color:var(--ink);
   font-size:14px}
@@ -329,8 +381,8 @@ def topbar(active: str, dry_run: bool, user_label: str) -> str:
     """
     links = "".join(
         f'<a href="{href}" aria-current="{"page" if href == active else "false"}">'
-        f"<i>{icon}</i><span>{name}</span></a>"
-        for href, name, icon in NAV
+        f"{icon(key)}<span>{name}</span></a>"
+        for href, name, key in NAV
     )
     mode = (
         '<span class="pill dry">Dry run</span>' if dry_run
@@ -348,7 +400,7 @@ def topbar(active: str, dry_run: bool, user_label: str) -> str:
     )
 
 
-def empty(icon: str, title: str, body: str, hint: str = "") -> str:
+def empty(glyph: str, title: str, body: str, hint: str = "") -> str:
     """An empty state should say what to DO, not just that there is nothing.
 
     With three events the old page looked broken rather than quiet, and gave a
@@ -356,7 +408,8 @@ def empty(icon: str, title: str, body: str, hint: str = "") -> str:
     """
     hint_html = f'<div class="hint">{hint}</div>' if hint else ""
     return (
-        f'<div class="card"><div class="empty"><div class="icon">{icon}</div>'
+        f'<div class="card"><div class="empty">'
+        f'<div class="icon">{icon(glyph, 30)}</div>'
         f"<h3>{title}</h3><p>{body}</p>{hint_html}</div></div>"
     )
 

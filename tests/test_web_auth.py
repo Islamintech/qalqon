@@ -336,3 +336,18 @@ def test_the_layout_reflows_rather_than_only_shrinking():
     assert ".item .when{margin-left:0" in css, "timestamp still steals the row"
     breakpoints = sorted({int(w) for w in re.findall(r"max-width:(\d+)px", css)})
     assert len(breakpoints) >= 4, f"too few breakpoints: {breakpoints}"
+
+
+def test_the_landing_page_test_count_is_not_stale(request):
+    """The landing page claims a number of automated tests. A claim about the
+    project that only a human remembers to update is a claim that goes wrong
+    quietly, so the suite counts itself."""
+    collected = len(request.session.items)
+    if collected < 300:
+        pytest.skip("a subset of the suite was run; the total is not knowable")
+    from web import landing, render
+
+    html = landing.page(render.LOGO, signed_in=False)
+    assert f"<b>{collected}</b><span>automated tests</span>" in html, (
+        f"the landing page states a different number; the suite has {collected}"
+    )

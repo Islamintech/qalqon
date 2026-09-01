@@ -268,7 +268,7 @@ def page(logo: str, signed_in: bool) -> str:
   <div class="facts">
     <div class="fact"><b>6</b><span>independent signals</span></div>
     <div class="fact"><b>∞</b><span>languages</span></div>
-    <div class="fact"><b>336</b><span>automated tests</span></div>
+    <div class="fact"><b>351</b><span>automated tests</span></div>
     <div class="fact"><b>&lt;1s</b><span>typical decision</span></div>
   </div>
 </div></div>
@@ -379,7 +379,7 @@ def page(logo: str, signed_in: bool) -> str:
     <span class="tech">FastAPI</span>
     <span class="tech">SQLite · WAL</span>
     <span class="tech">Docker</span>
-    <span class="tech">pytest · 336 tests</span>
+    <span class="tech">pytest · 351 tests</span>
     <span class="tech">nginx · Let's Encrypt</span>
   </div>
   <div class="grid g3">

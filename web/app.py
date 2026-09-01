@@ -133,11 +133,14 @@ async def login(request: Request):
             'data-request-access="write"></script>'
         )
     if settings.web_access_token:
+        # Only draw the divider when there is something above it to divide.
+        rule = '<div class="or"><span>or</span></div>' if blocks else ""
         blocks.append(
-            '<form method="post" action="/auth/token" style="margin-top:18px">'
-            '<input class="field" type="password" name="token" '
-            'placeholder="access token" autocomplete="current-password">'
-            '<button class="btn" type="submit">Sign in</button></form>'
+            f'{rule}<form method="post" action="/auth/token">'
+            '<label class="lbl" for="tok">Access token</label>'
+            '<input class="field" id="tok" type="password" name="token" '
+            'placeholder="••••••••••••••••" autocomplete="current-password">'
+            '<button class="btn" type="submit">Continue</button></form>'
         )
     if not blocks:
         return page(
@@ -148,9 +151,11 @@ async def login(request: Request):
             "a token instead.</p></div></main>"
         )
     return page(
-        f"<main class=login><div class=card><h1>Qalqon</h1>"
-        f"<p>Only allow-listed admins can view this dashboard.</p>"
-        f"{''.join(blocks)}</div></main>"
+        f"<main class=login><div class=card><h1>Sign in to the dashboard</h1>"
+        f"<p>Only the administrators of a watched group can open it.</p>"
+        f"{''.join(blocks)}</div>"
+        f'<p class="foot">The dashboard is read-only. Moderation decisions are '
+        f"reviewed from Telegram, where the alert arrives.</p></main>"
     )
 
 
@@ -266,7 +271,7 @@ def _db_error(user_id, exc) -> HTMLResponse:
     return shell(
         pages.head("Database unavailable")
         + render.empty(
-            "⚠️", "Cannot read the moderation database",
+            "warn", "Cannot read the moderation database",
             f"{pages.e(exc)} — expected at {pages.e(settings.db_path)}. "
             "The dashboard opens it read-only, so the bot must have created "
             "it first.",

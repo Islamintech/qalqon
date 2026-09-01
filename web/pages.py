@@ -65,8 +65,8 @@ def tiles(pairs) -> str:
 
 
 def act_chip(action: str) -> str:
-    label, icon = render.LABEL.get(action, (action, "•"))
-    return f'<span class="act {e(action)}">{icon} {label}</span>'
+    label, key = render.LABEL.get(action, (action, ""))
+    return f'<span class="act {e(action)}">{render.icon(key, 12)}{label}</span>'
 
 
 # --- pages -----------------------------------------------------------------
@@ -95,7 +95,7 @@ def overview(data) -> str:
 
     if not chats:
         return head("Overview") + render.empty(
-            "🛡️", "Qalqon is running, but not watching anything yet",
+            "shield", "Qalqon is running, but not watching anything yet",
             "Add the bot to a group and make it an administrator with "
             "permission to delete messages and ban users. It starts working "
             "there immediately — nothing to configure here.",
@@ -152,7 +152,7 @@ def groups(data) -> str:
     chats = data["chats"]
     if not chats:
         return head("Groups") + render.empty(
-            "◍", "No groups yet",
+            "groups", "No groups yet",
             "Qalqon watches a group as soon as it is added to it as an "
             "administrator.",
         )
@@ -190,7 +190,7 @@ def members(data) -> str:
     offenders, chats = data["offenders"], data["chats"]
     if not offenders:
         return head("Members") + render.empty(
-            "◎", "Nobody has a strike",
+            "member", "Nobody has a strike",
             "Members appear here once Qalqon has acted on something they "
             "posted. An empty list means the groups are clean — or that "
             "nothing has been posted yet.",
@@ -219,9 +219,10 @@ def _status_chip(status: str) -> str:
         "banned": "Removed", "whitelisted": "Trusted", "normal": "Normal",
     }.get(status, status)
     cls = {"banned": "BAN", "whitelisted": "ADMIN_WHITELIST"}.get(status, "REVIEW")
+    key = {"banned": "ban", "whitelisted": "check"}.get(status, "warn")
     if status == "normal":
         return '<span class="dim">Normal</span>'
-    return f'<span class="act {cls}">{text}</span>'
+    return f'<span class="act {cls}">{render.icon(key, 12)}{text}</span>'
 
 
 def activity(data) -> str:
@@ -245,7 +246,7 @@ def activity(data) -> str:
             head("Activity", f"{scope} · last {days} days")
             + filters
             + render.empty(
-                "◔", "Nothing has happened",
+                "quiet", "Nothing has happened",
                 "Qalqon has not needed to act in this period. That is the "
                 "outcome you want — it means nothing suspicious was posted.",
             )
@@ -299,7 +300,7 @@ def usage(data) -> str:
 
     if not u["attempts"]:
         return pages_head_usage() + render.empty(
-            "◔", "No analysis recorded yet",
+            "bars", "No analysis recorded yet",
             "Every message Qalqon sends to the language model is logged here "
             "with its token count and latency. Nothing has been analysed in "
             "this period.",
