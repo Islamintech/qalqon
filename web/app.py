@@ -20,7 +20,9 @@ import logging
 import os
 import sys
 import time
+from contextvars import ContextVar
 from datetime import datetime, timezone
+from urllib.parse import quote
 
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -79,12 +81,58 @@ def e(value) -> str:
     return html.escape(str(value if value is not None else ""), quote=True)
 
 
+THEME_COOKIE = "qalqon_theme"
+THEMES = {"light", "dark"}
+
+# The chosen theme has to reach _document(), which every page funnels through
+# and which has no Request. Threading it through a dozen call sites would put
+# a parameter nobody reads into every signature, so it rides a context
+# variable set once per request instead.
+_theme: ContextVar[str] = ContextVar("theme", default="")
+_here: ContextVar[str] = ContextVar("here", default="/")
+
+
+@app.middleware("http")
+async def _remember_theme(request: Request, call_next):
+    chosen = request.cookies.get(THEME_COOKIE, "")
+    tok_t = _theme.set(chosen if chosen in THEMES else "")
+    here = request.url.path
+    if request.url.query:
+        here = f"{here}?{request.url.query}"
+    tok_h = _here.set(here)
+    try:
+        return await call_next(request)
+    finally:
+        _theme.reset(tok_t)
+        _here.reset(tok_h)
+
+
+@app.get("/theme")
+async def set_theme(v: str = "auto", next: str = "/"):
+    """Store the choice and go back where the reader was.
+
+    `next` comes off a URL, so it is only ever used when it is a path on this
+    site: a bare '/foo'. Anything else — an absolute URL, a protocol-relative
+    '//host' — would make this an open redirect.
+    """
+    target = next if next.startswith("/") and not next.startswith("//") else "/"
+    response = RedirectResponse(target, status_code=303)
+    if v in THEMES:
+        response.set_cookie(
+            THEME_COOKIE, v, max_age=31536000, path="/",
+            samesite="lax", httponly=False,
+        )
+    else:
+        response.delete_cookie(THEME_COOKIE, path="/")
+    return response
+
+
 def shell(body: str, user_id: int, active: str) -> HTMLResponse:
     """A signed-in page: top bar + content."""
     label = "signed in with a token" if user_id == TOKEN_USER else f"ID {user_id}"
     return _document(
         f'<div class="shell">'
-        f"{render.topbar(active, settings.dry_run, label)}"
+        f"{render.topbar(active, settings.dry_run, label, _theme.get(), quote(_here.get(), safe='/?=&'))}"
         f"<main>{body}</main>"
         f"</div>"
     )
@@ -102,13 +150,18 @@ def _document(inner: str, extra_css: str = "", public: bool = False) -> HTMLResp
         "index,follow" if public
         else "noindex,nofollow"
     )
+    # An explicit choice is stamped on the root element; "auto" stamps nothing
+    # and leaves the media query in charge.
+    chosen = _theme.get()
+    theme_attr = f' data-theme="{chosen}"' if chosen in THEMES else ""
     desc = (
         "Qalqon is an anti-scam moderation bot for Telegram communities. It "
         "detects fraud across languages, removes clear attacks, and asks a "
         "human about the rest."
     )
     return HTMLResponse(
-        "<!doctype html><html lang=en><head><meta charset=utf-8>"
+        f"<!doctype html><html lang=en{theme_attr}>"
+        "<head><meta charset=utf-8>"
         "<meta name=viewport content='width=device-width,initial-scale=1'>"
         f"<meta name=robots content='{robots}'>"
         f'<meta name="description" content="{desc}">'
@@ -284,7 +337,9 @@ async def home(request: Request):
     """Public. The URL people are given, so it explains the project rather
     than bouncing a stranger to a login box."""
     return _document(
-        landing.page(render.LOGO, signed_in=bool(_current_user(request))),
+        landing.page(render.LOGO, signed_in=bool(_current_user(request)),
+                     theme=_theme.get(),
+                     here=quote(_here.get(), safe="/?=&")),
         extra_css=landing.CSS, public=True,
     )
 

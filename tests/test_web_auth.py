@@ -378,3 +378,81 @@ def test_the_two_stylesheets_do_not_define_the_same_class():
 
     shared = unscoped(render.CSS) & unscoped(landing.CSS)
     assert not shared, f"defined in both stylesheets: {sorted(shared)}"
+
+
+# --- the colour theme -------------------------------------------------------
+
+def _client():
+    from fastapi.testclient import TestClient
+
+    from web import app as web_app
+
+    return TestClient(web_app.app)
+
+
+def _html_tag(text: str) -> str:
+    """Just the <html ...> tag: the stylesheet mentions data-theme too."""
+    return text[text.index("<html"):text.index(">", text.index("<html")) + 1]
+
+
+def test_the_theme_defaults_to_the_system_setting():
+    """No cookie means no data-theme attribute, so the media query decides."""
+    r = _client().get("/")
+    assert "data-theme" not in _html_tag(r.text)
+    assert "prefers-color-scheme:dark" in r.text
+
+
+@pytest.mark.parametrize("choice", ["light", "dark"])
+def test_choosing_a_theme_stamps_it_on_the_page(choice):
+    with _client() as client:
+        client.get(f"/theme?v={choice}&next=/", follow_redirects=False)
+        r = client.get("/")
+    assert f'<html lang=en data-theme="{choice}">' in r.text
+
+
+def test_returning_to_auto_clears_the_choice():
+    with _client() as client:
+        client.get("/theme?v=dark&next=/", follow_redirects=False)
+        client.get("/theme?v=auto&next=/", follow_redirects=False)
+        r = client.get("/")
+    assert "data-theme" not in _html_tag(r.text)
+
+
+def test_an_unknown_theme_is_ignored_rather_than_stamped():
+    with _client() as client:
+        client.get("/theme?v=<script>&next=/", follow_redirects=False)
+        r = client.get("/")
+    assert "data-theme" not in _html_tag(r.text)
+
+
+@pytest.mark.parametrize("hostile", [
+    "https://evil.example/",     # absolute
+    "//evil.example/",           # protocol-relative
+    "javascript:alert(1)",
+])
+def test_the_theme_switch_cannot_be_used_as_an_open_redirect(hostile):
+    """`next` comes off a URL anyone can hand a signed-in admin."""
+    r = _client().get(f"/theme?v=dark&next={hostile}", follow_redirects=False)
+    assert r.status_code == 303
+    assert r.headers["location"] == "/"
+
+
+def test_the_switch_offers_all_three_states_and_marks_the_current_one():
+    from web import render
+
+    html = render.theme_switch("dark", "/activity")
+    for value in ("auto", "light", "dark"):
+        assert f"/theme?v={value}" in html
+    assert html.count('aria-current="true"') == 1
+    assert 'href="/theme?v=dark&amp;next=/activity"' in html
+
+
+def test_both_palettes_define_every_token():
+    """A token defined in one palette and not the other renders as an empty
+    value — an invisible element rather than a loud failure."""
+    import re
+
+    from web import render
+
+    names = lambda block: set(re.findall(r"(--[\w-]+):", block))
+    assert names(render.LIGHT) == names(render.DARK)

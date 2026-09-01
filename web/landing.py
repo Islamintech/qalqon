@@ -243,7 +243,8 @@ def _pipeline() -> str:
     return "".join(out)
 
 
-def page(logo: str, signed_in: bool) -> str:
+def page(logo: str, signed_in: bool, theme: str = "",
+         here: str = "/") -> str:
     cta = (
         '<a class="lp-btn" href="/app">Open dashboard</a>' if signed_in
         else '<a class="lp-btn" href="/login">Admin sign in</a>'
@@ -258,7 +259,7 @@ def page(logo: str, signed_in: bool) -> str:
     <a href="#safety">Safety</a>
     <a href="#stack">Built with</a>
   </nav>
-  <div class="lp-cta">{cta}</div>
+  <div class="lp-cta">{render.theme_switch(theme, here)}{cta}</div>
 </div></header>
 
 <div class="hero-wrap"><div class="hero-in lp-hero">
@@ -274,7 +275,7 @@ def page(logo: str, signed_in: bool) -> str:
   <div class="facts">
     <div class="fact"><b>6</b><span>independent signals</span></div>
     <div class="fact"><b>∞</b><span>languages</span></div>
-    <div class="fact"><b>352</b><span>automated tests</span></div>
+    <div class="fact"><b>362</b><span>automated tests</span></div>
     <div class="fact"><b>&lt;1s</b><span>typical decision</span></div>
   </div>
 </div></div>
@@ -385,7 +386,7 @@ def page(logo: str, signed_in: bool) -> str:
     <span class="tech">FastAPI</span>
     <span class="tech">SQLite · WAL</span>
     <span class="tech">Docker</span>
-    <span class="tech">pytest · 352 tests</span>
+    <span class="tech">pytest · 362 tests</span>
     <span class="tech">nginx · Let's Encrypt</span>
   </div>
   <div class="grid g3">

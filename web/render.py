@@ -89,7 +89,27 @@ PATHS = {
                  '<path d="M4.6 9.4v2.8h2v-2"/>',
     "lock": '<rect x="3" y="7" width="10" height="6.4" rx="1.6"/>'
             '<path d="M5.4 7V5.2a2.6 2.6 0 0 1 5.2 0V7"/>',
+    # --- theme switch ------------------------------------------------------
+    "auto": '<circle cx="8" cy="8" r="5.6"/>'
+            '<path d="M8 2.4v11.2" stroke-width="1.2"/>'
+            '<path d="M8 3.6a4.4 4.4 0 0 1 0 8.8Z" fill="currentColor" '
+            'stroke="none"/>',
+    "sun": '<circle cx="8" cy="8" r="2.9"/>'
+           '<path d="M8 1.6v1.5M8 12.9v1.5M14.4 8h-1.5M3.1 8H1.6'
+           'M12.5 3.5l-1 1M4.5 11.5l-1 1M12.5 12.5l-1-1M4.5 4.5l-1-1"/>',
+    "moon": '<path d="M13 9.4A5.6 5.6 0 0 1 6.6 3a5.8 5.8 0 1 0 6.4 6.4Z"/>',
 }
+
+
+PLURAL = {"BAN": "removed", "DELETE": "deleted", "REVIEW": "to review"}
+
+NAV = [
+    ("/app", "Overview", "grid"),
+    ("/groups", "Groups", "groups"),
+    ("/members", "Members", "member"),
+    ("/activity", "Activity", "clock"),
+    ("/usage", "Usage", "bars"),
+]
 
 
 def icon(name: str, size: float = 14) -> str:
@@ -103,19 +123,11 @@ def icon(name: str, size: float = 14) -> str:
         f'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
         f"{path}</svg>"
     )
-PLURAL = {"BAN": "removed", "DELETE": "deleted", "REVIEW": "to review"}
 
-NAV = [
-    ("/app", "Overview", "grid"),
-    ("/groups", "Groups", "groups"),
-    ("/members", "Members", "member"),
-    ("/activity", "Activity", "clock"),
-    ("/usage", "Usage", "bars"),
-]
 
-CSS = """
-*,*::before,*::after{box-sizing:border-box}
-:root{
+# The two palettes, defined once and emitted three times below: for the
+# default, for the OS preference, and for an explicit choice.
+LIGHT = """
   color-scheme:light;
   --page:#f6f7f9; --card:#ffffff; --raised:#f2f4f7;
   --line:#e4e7ec; --line-soft:#eef1f4;
@@ -126,20 +138,32 @@ CSS = """
   --good:#0f8a3d; --good-bg:#e7f6ec;
   --shadow:0 1px 2px rgba(16,20,24,.05),0 1px 3px rgba(16,20,24,.04);
   --shadow-lg:0 2px 4px rgba(16,20,24,.05),0 8px 24px rgba(16,20,24,.07);
-}
-@media (prefers-color-scheme:dark){
-  :root{
-    color-scheme:dark;
-    --page:#0f1115; --card:#171a21; --raised:#1c2029;
-    --line:#242936; --line-soft:#1e222c;
-    --ink:#e9ecf2; --ink-2:#a2a9b8; --muted:#767d8d;
-    --accent:#3987e5; --accent-soft:#17253b; --accent-ink:#8ab4ff;
-    --review:#3987e5; --delete:#c98500; --ban:#d55181;
-    --review-bg:#152435; --delete-bg:#2d2510; --ban-bg:#33202a;
-    --good:#3fbe6b; --good-bg:#152a1c;
-    --shadow:none; --shadow-lg:none;
-  }
-}
+"""
+
+DARK = """
+  color-scheme:dark;
+  --page:#0f1115; --card:#171a21; --raised:#1c2029;
+  --line:#242936; --line-soft:#1e222c;
+  --ink:#e9ecf2; --ink-2:#a2a9b8; --muted:#767d8d;
+  --accent:#3987e5; --accent-soft:#17253b; --accent-ink:#8ab4ff;
+  --review:#3987e5; --delete:#c98500; --ban:#d55181;
+  --review-bg:#152435; --delete-bg:#2d2510; --ban-bg:#33202a;
+  --good:#3fbe6b; --good-bg:#152a1c;
+  --shadow:none; --shadow-lg:none;
+"""
+
+CSS = f"""
+*,*::before,*::after{{box-sizing:border-box}}
+
+/* Light is the default. The OS preference applies unless the reader has
+   explicitly asked for light, and an explicit choice beats both — which is
+   why the dark block appears twice rather than being written as one rule. */
+:root{{{LIGHT}}}
+@media (prefers-color-scheme:dark){{
+  :root:not([data-theme="light"]){{{DARK}}}
+}}
+:root[data-theme="dark"]{{{DARK}}}
+""" + """
 body{margin:0;background:var(--page);color:var(--ink);
   font:15px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
   -webkit-font-smoothing:antialiased}
@@ -172,6 +196,15 @@ nav a .ic{opacity:.75;flex:none}
 .act .ic,.empty .ic{flex:none}
 .bar-end{margin-left:auto;display:flex;align-items:center;gap:14px;flex:none}
 .bar-end .who{font-size:12.5px;color:var(--muted);white-space:nowrap}
+.theme{display:flex;gap:1px;padding:2px;border-radius:9px;background:var(--raised);
+  border:1px solid var(--line);flex:none}
+.theme .seg{display:flex;align-items:center;justify-content:center;
+  width:27px;height:22px;border-radius:7px;color:var(--muted);line-height:0}
+.theme .seg:hover{color:var(--ink);text-decoration:none}
+/* The selected segment is tinted, not merely a different surface: against the
+   dark track, --card is DARKER than --raised, so a surface swap read as an
+   inset hole rather than a selection. */
+.theme .seg.on{background:var(--accent-soft);color:var(--accent-ink)}
 .bar-end a{font-size:12.5px;color:var(--ink-2)}
 .bar-end a:hover{color:var(--accent-ink)}
 main{flex:1;width:100%;max-width:1240px;margin:0 auto;padding:28px 26px 64px}
@@ -392,7 +425,8 @@ LOGO = (
 )
 
 
-def topbar(active: str, dry_run: bool, user_label: str) -> str:
+def topbar(active: str, dry_run: bool, user_label: str,
+           theme: str = "", here: str = "/app") -> str:
     """Horizontal navigation.
 
     Five destinations do not justify a fixed column stealing a fifth of the
@@ -414,10 +448,34 @@ def topbar(active: str, dry_run: bool, user_label: str) -> str:
         f'<span>Qalqon</span></a>'
         f"<nav>{links}</nav>"
         f'<div class="bar-end">{mode}'
+        f"{theme_switch(theme, here)}"
         f'<span class="who">{user_label}</span>'
         f'<a href="/logout">Sign out</a></div>'
         f"</div></header>"
     )
+
+
+THEMES = [("auto", "auto", "Match my system"),
+          ("light", "sun", "Light"),
+          ("dark", "moon", "Dark")]
+
+
+def theme_switch(current: str, here: str) -> str:
+    """Three states, not two.
+
+    A two-way toggle silently makes a choice on the reader's behalf the first
+    time they touch it, and gives them no way back to "whatever my system
+    says" — which is the setting most people actually want.
+    """
+    links = "".join(
+        f'<a href="/theme?v={value}&amp;next={here}" class="seg'
+        f'{" on" if value == (current or "auto") else ""}" '
+        f'title="{title}" aria-label="{title}" '
+        f'aria-current="{"true" if value == (current or "auto") else "false"}">'
+        f"{icon(key, 13)}</a>"
+        for value, key, title in THEMES
+    )
+    return f'<div class="theme" role="group" aria-label="Colour theme">{links}</div>'
 
 
 def empty(glyph: str, title: str, body: str, hint: str = "") -> str:
