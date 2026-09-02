@@ -136,7 +136,29 @@ sudo -u qalqon .venv/bin/python -m pytest -q      # requirements-dev.txt
 sudo systemctl restart qalqon
 ```
 
+**If you also run the dashboard, restart it too:**
+
+```bash
+sudo -u qalqon .venv/bin/pip install -r requirements-web.txt
+sudo systemctl restart qalqon-web
+```
+
+`qalqon` and `qalqon-web` are two independent units — that separation is the
+point, so the panel can be restarted without interrupting moderation. The cost
+is that restarting only `qalqon` leaves the dashboard serving the code it
+started with, however long ago that was. A web-only change (anything under
+`web/`) shows no sign of having deployed until `qalqon-web` is restarted, and
+the symptom is simply the old page, which reads as a browser cache rather than
+a missed step.
+
+If a page still looks stale after the restart, hard-reload once (Ctrl+Shift+R)
+before assuming the deploy failed — the reverse proxy may be holding it.
+
 The database migrates itself on start; check the logs after a schema change.
+
+Under Docker, `git pull && docker compose up -d --build` rebuilds both — the
+code is baked into the image, so a plain `docker compose restart` deploys
+nothing.
 
 ## What tells you it broke
 
