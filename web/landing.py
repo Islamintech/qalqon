@@ -243,24 +243,67 @@ def _pipeline() -> str:
     return "".join(out)
 
 
-def page(logo: str, signed_in: bool, theme: str = "",
-         here: str = "/") -> str:
+def header(logo: str, signed_in: bool, theme: str = "", here: str = "/",
+           nav: str = "") -> str:
+    """The public site header, shared by the landing page and the notice.
+
+    `nav` is passed in rather than fixed: the landing page's links are anchors
+    into its own sections, which point nowhere from any other page.
+    """
     cta = (
         '<a class="lp-btn" href="/app">Open dashboard</a>' if signed_in
         else '<a class="lp-btn" href="/login">Admin sign in</a>'
     )
+    if not nav:
+        nav = (
+            '<a href="/#problem">The problem</a>'
+            '<a href="/#how">How it works</a>'
+            '<a href="/#safety">Safety</a>'
+            '<a href="/#stack">Built with</a>'
+        )
+    return (
+        f'<header class="lp-head"><div class="in">'
+        f'<a class="lp-brand" href="/">{logo}Qalqon</a>'
+        f'<nav class="lp-nav">{nav}</nav>'
+        f'<div class="lp-cta">{render.theme_switch(theme, here)}{cta}</div>'
+        f"</div></header>"
+    )
+
+
+def footer(logo: str) -> str:
+    """The public site footer, shared by the landing page and the notice."""
+    return f"""
+<footer class="lp-foot">
+  <div class="in">
+    <div class="col">
+      <a class="lp-brand" href="/" style="margin-bottom:12px">{logo}Qalqon</a>
+      <p style="color:var(--muted)">Anti-scam moderation for Telegram
+      communities.</p>
+    </div>
+    <div class="col"><h4>Product</h4>
+      <a href="/#how">How it works</a><a href="/#safety">Safety</a>
+      <a href="/privacy">Privacy notice</a></div>
+    <div class="col"><h4>Admins</h4>
+      <a href="/login">Sign in</a>
+      <a href="https://t.me/QalqonSafeBot">@QalqonSafeBot</a></div>
+    <div class="col"><h4>Author</h4>
+      <a href="https://github.com/Islamintech">Islombek Ergashev</a>
+      <p style="color:var(--muted)">Built 2026</p></div>
+  </div>
+  <div class="bottom">© 2026 Qalqon. Anti-scam moderation for Telegram
+  communities.</div>
+</footer>"""
+
+
+def page(logo: str, signed_in: bool, theme: str = "",
+         here: str = "/") -> str:
+    nav = ('<a href="#problem">The problem</a>'
+           '<a href="#how">How it works</a>'
+           '<a href="#safety">Safety</a>'
+           '<a href="#stack">Built with</a>')
     return f"""
 <div class="lp">
-<header class="lp-head"><div class="in">
-  <a class="lp-brand" href="/">{logo}Qalqon</a>
-  <nav class="lp-nav">
-    <a href="#problem">The problem</a>
-    <a href="#how">How it works</a>
-    <a href="#safety">Safety</a>
-    <a href="#stack">Built with</a>
-  </nav>
-  <div class="lp-cta">{render.theme_switch(theme, here)}{cta}</div>
-</div></header>
+{header(logo, signed_in, theme, here, nav)}
 
 <div class="hero-wrap"><div class="hero-in lp-hero">
   <div class="eyebrow">Telegram moderation</div>
@@ -275,7 +318,7 @@ def page(logo: str, signed_in: bool, theme: str = "",
   <div class="facts">
     <div class="fact"><b>6</b><span>independent signals</span></div>
     <div class="fact"><b>∞</b><span>languages</span></div>
-    <div class="fact"><b>366</b><span>automated tests</span></div>
+    <div class="fact"><b>369</b><span>automated tests</span></div>
     <div class="fact"><b>&lt;1s</b><span>typical decision</span></div>
   </div>
 </div></div>
@@ -386,7 +429,7 @@ def page(logo: str, signed_in: bool, theme: str = "",
     <span class="tech">FastAPI</span>
     <span class="tech">SQLite · WAL</span>
     <span class="tech">Docker</span>
-    <span class="tech">pytest · 366 tests</span>
+    <span class="tech">pytest · 369 tests</span>
     <span class="tech">nginx · Let's Encrypt</span>
   </div>
   <div class="grid g3">
@@ -402,25 +445,6 @@ def page(logo: str, signed_in: bool, theme: str = "",
   </div>
 </section>
 
-<footer class="lp-foot">
-  <div class="in">
-    <div class="col">
-      <a class="lp-brand" href="/" style="margin-bottom:12px">{logo}Qalqon</a>
-      <p style="color:var(--muted)">Anti-scam moderation for Telegram
-      communities.</p>
-    </div>
-    <div class="col"><h4>Product</h4>
-      <a href="#how">How it works</a><a href="#safety">Safety</a>
-      <a href="/privacy">Privacy notice</a></div>
-    <div class="col"><h4>Admins</h4>
-      <a href="/login">Sign in</a>
-      <a href="https://t.me/QalqonSafeBot">@QalqonSafeBot</a></div>
-    <div class="col"><h4>Author</h4>
-      <a href="https://github.com/Islamintech">Islombek Ergashev</a>
-      <p style="color:var(--muted)">Built 2026</p></div>
-  </div>
-  <div class="bottom">© 2026 Qalqon. Anti-scam moderation for Telegram
-  communities.</div>
-</footer>
+{footer(logo)}
 </div>
 """

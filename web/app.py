@@ -30,7 +30,9 @@ from fastapi.responses import HTMLResponse, RedirectResponse, Response
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from config import settings  # noqa: E402
+from models import store  # noqa: E402
 from web import landing, pages, pricing, queries, render  # noqa: E402
+from web import privacy as privacy_page  # noqa: E402
 from web.auth import (  # noqa: E402
     TOKEN_USER, is_allowed, issue_session, read_session, session_secret,
     verify_access_token, verify_telegram_login,
@@ -411,77 +413,27 @@ async def usage(request: Request):
 async def privacy(request: Request):
     """Public — no sign-in. A privacy notice behind a login is not a notice.
 
-    The retention figure is read from the live configuration rather than
-    written into the prose, so the page cannot claim one thing while the bot
-    does another. If someone sets EVENT_RETENTION_DAYS=0, this page says so.
+    Every figure is read from the live configuration rather than written into
+    the prose, so the page cannot claim one thing while the bot does another.
+    If someone sets EVENT_RETENTION_DAYS=0, this page says so.
+
+    It is `public=True`: Telegram links here from the bot's profile, and unlike
+    the rest of web/ the page carries no group data, so it belongs in search
+    results alongside the landing page.
     """
-    days = settings.event_retention_days
-    if days:
-        keep_uz = (
-            f"Bu yozuvlar <b>{days} kundan</b> keyin avtomatik o'chiriladi."
-        )
-        keep_en = f"These records are deleted automatically after {days} days."
-    else:
-        keep_uz = (
-            "Hozircha bu yozuvlar <b>muddatsiz</b> saqlanmoqda "
-            "(EVENT_RETENTION_DAYS=0)."
-        )
-        keep_en = (
-            "These records are currently kept <b>indefinitely</b> "
-            "(EVENT_RETENTION_DAYS=0)."
-        )
-
-    body = f"""
-<main style="max-width:720px">
-<section>
-<h2>Maxfiylik siyosati</h1>
-<div class="card" style="line-height:1.65">
-
-<p><b>Qalqon</b> — guruhlarni firibgarlik va spamdan himoya qiluvchi
-moderator bot. Bu sahifada bot qanday ma'lumot saqlashi tushuntirilgan.</p>
-
-<p><b>Nima saqlanadi.</b> Bot faqat o'zi chora ko'rgan holatlarni yozib
-qo'yadi: guruh identifikatori, foydalanuvchi identifikatori va useri, qaror
-(o'chirildi / bloklandi / ko'rib chiqilsin), qaror sababi va o'sha xabarning
-dastlabki 500 belgisi. Bundan tashqari har bir a'zo uchun yuborilgan xabarlar
-soni, ogohlantirishlar soni va holati (oddiy / ishonchli / bloklangan)
-saqlanadi.</p>
-
-<p><b>Nima saqlanmaydi.</b> Oddiy suhbat saqlanmaydi. Agar xabar shubhali
-topilmasa, uning matni hech qayerga yozilmaydi. Bot shaxsiy xabarlarni
-o'qimaydi, telefon raqami, manzil yoki to'lov ma'lumotlarini yig'maydi.</p>
-
-<p><b>Qancha vaqt.</b> {keep_uz} Ogohlantirishlar
-{settings.strike_decay_days} kundan keyin kuchini yo'qotadi.</p>
-
-<p><b>Kim ko'radi.</b> Yozuvlarni faqat guruh adminlari va bot egasi ko'ra
-oladi. Ma'lumot uchinchi shaxslarga sotilmaydi va berilmaydi.</p>
-
-<p><b>Tashqi xizmatlar.</b> Xabar matni tahlil uchun
-<a href="https://groq.com">Groq</a>ga, profil rasmi esa
-<a href="https://huggingface.co">Hugging Face</a>ga yuboriladi. Ular bu
-ma'lumotni faqat javob qaytarish uchun ishlatadi.</p>
-
-<p><b>O'chirish.</b> O'zingiz haqingizdagi yozuvlarni o'chirishni so'rash
-uchun guruh admini bilan bog'laning.</p>
-
-<hr style="border:0;border-top:1px solid #242936;margin:22px 0">
-
-<h3 style="font-size:14px;text-transform:none;letter-spacing:0;color:#a2a9b8">
-English summary</h3>
-<p class="dim" style="font-size:13px">Qalqon is an anti-scam moderation bot.
-It records only the cases it acted on: the group and user id, the decision,
-the reason, and the first 500 characters of the triggering message — plus each
-member's message count, strikes and status. Ordinary conversation is never
-stored. {keep_en} Strikes expire after {settings.strike_decay_days} days.
-Records are visible only to group admins and the operator, and are never sold
-or shared. Message text is sent to Groq for analysis and profile photos to
-Hugging Face. To request deletion, contact your group admin.</p>
-
-</div>
-</section>
-</div></main>"""
-    return page(body, _current_user(request))
+    return _document(
+        privacy_page.page(
+            render.LOGO,
+            signed_in=bool(_current_user(request)),
+            theme=_theme.get(),
+            here=quote(_here.get(), safe="/?=&"),
+            retention_days=settings.event_retention_days,
+            strike_days=settings.strike_decay_days,
+            snippet_chars=store.SNIPPET_CHARS,
+        ),
+        extra_css=landing.CSS + privacy_page.CSS,
+        public=True,
+    )
 
 
 @app.get("/favicon.svg")

@@ -223,6 +223,48 @@ def test_privacy_page_states_the_configured_retention():
         assert "muddatsiz" in body
 
 
+def test_privacy_page_quotes_the_real_snippet_length():
+    """The notice tells people how much of a flagged message is kept. That
+    figure is the constant the writer actually truncates with, so trimming the
+    snippet in store.py can never leave the promise behind."""
+    from fastapi.testclient import TestClient
+
+    from models.store import SNIPPET_CHARS
+    from web.app import app
+
+    with TestClient(app) as client:
+        body = client.get("/privacy").text
+    assert str(SNIPPET_CHARS) in body
+
+
+def test_privacy_page_is_indexable_and_carries_both_languages():
+    """Telegram links here from the bot's profile, so it belongs in search
+    results — and the readers arriving are split between Uzbek and English, so
+    neither may be reduced to a footnote."""
+    from fastapi.testclient import TestClient
+
+    from web.app import app
+
+    with TestClient(app) as client:
+        body = client.get("/privacy").text
+    assert "index,follow" in body
+    assert "SAQLANADI" in body          # the Uzbek ledger
+    assert "What is recorded" in body   # the full English translation
+
+
+def test_privacy_page_states_the_configured_strike_decay():
+    """Strikes expiring is a privacy promise as much as retention is: it is the
+    difference between a warning and a permanent record."""
+    from fastapi.testclient import TestClient
+
+    from config import settings
+    from web.app import app
+
+    with TestClient(app) as client:
+        body = client.get("/privacy").text
+    assert str(settings.strike_decay_days) in body
+
+
 # --- the public landing page ------------------------------------------------
 def test_the_landing_page_is_public_and_indexable():
     """It is the URL people are given, so a stranger must not be bounced to a

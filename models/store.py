@@ -31,6 +31,11 @@ STATUS_BANNED = "banned"
 DAY = 86400.0
 SCHEMA_VERSION = 4
 
+# How much of a flagged message is kept. Named rather than inlined because the
+# public privacy notice quotes this figure, and a notice that states a number
+# the code no longer uses is worse than one that states none.
+SNIPPET_CHARS = 500
+
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS users (
     chat_id       INTEGER NOT NULL,
@@ -459,7 +464,7 @@ class Store:
     async def prune_events(self) -> int:
         """Delete moderation records older than the retention window.
 
-        The events table holds up to 500 characters of real people's messages —
+        The events table holds up to SNIPPET_CHARS of real people's messages —
         necessary to judge whether a flag was a false positive, but it is other
         people's private conversation, and keeping it forever is a choice
         nobody made deliberately. The audit value of a record decays quickly;
@@ -511,7 +516,8 @@ class Store:
             conn.commit()
 
         await self._run(
-            _log, chat_id, user_id, time.time(), action, risk, reason, text[:500]
+            _log, chat_id, user_id, time.time(), action, risk, reason,
+            text[:SNIPPET_CHARS],
         )
 
 
