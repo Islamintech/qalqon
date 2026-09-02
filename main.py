@@ -130,6 +130,7 @@ def main() -> None:
         policy=Policy(
             require_profile_confirmation=settings.require_profile_confirmation,
             strikes_to_escalate=settings.strikes_to_escalate,
+            require_history_to_ban=not settings.ban_on_first_offence,
         ),
         keyword_filter=KeywordFilter(),
         llm_client=LLMClient(

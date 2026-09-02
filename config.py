@@ -46,6 +46,16 @@ class Settings:
     # Messages a member must post, strike-free, before they are "established"
     # and can no longer be auto-banned over a single message.
     trust_after_messages: int = int(os.getenv("TRUST_AFTER_MESSAGES", "25"))
+    # Whether a member with NO prior strikes can be banned outright. Off by
+    # default: the commonest way to score FIFTY_FIFTY on a profile is "no
+    # profile photo", which describes most newcomers, so one LLM misfire could
+    # remove a genuine new member before any human saw it. With this off they
+    # lose the message and the admin is alerted; a ban needs either a prior
+    # strike or BOTH the message and the profile at RED_FLAG. Set to true to
+    # restore the old behaviour.
+    ban_on_first_offence: bool = (
+        os.getenv("BAN_ON_FIRST_OFFENCE", "false").lower() == "true"
+    )
     # A strike stops counting toward escalation after this many days. One bad
     # week should not still be pushing someone toward a ban a year later.
     # Set to 0 to disable decay and keep strikes forever.

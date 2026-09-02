@@ -26,7 +26,10 @@ C, F, R = Risk.CLEAN, Risk.FIFTY_FIFTY, Risk.RED_FLAG
     ],
 )
 def test_base_matrix(content, profile, expected):
-    assert Policy().decide(v(content), v(profile)).action is expected
+    """The matrix itself, with the first-offence cap out of the way — that cap
+    is a separate adjustment on top and has its own tests below."""
+    p = Policy(require_history_to_ban=False)
+    assert p.decide(v(content), v(profile)).action is expected
 
 
 def test_clean_content_never_acts_whatever_the_history():
@@ -71,9 +74,17 @@ def test_missing_profile_is_treated_as_clean_not_as_guilt():
 
 
 def test_profile_confirmation_disabled():
+    """Judging on content alone. The first-offence cap still applies, and here
+    it matters MORE, not less: with the profile ignored there is only ever one
+    signal, so nothing can corroborate it. A first offence is removed, a second
+    is banned."""
     p = Policy(require_profile_confirmation=False)
-    assert p.decide(v(R), v(C)).action is Action.BAN
+    assert p.decide(v(R), v(C)).action is Action.DELETE
+    assert p.decide(v(R), v(C), strikes=1).action is Action.BAN
     assert p.decide(v(F), v(C)).action is Action.REVIEW
+    # ...and an operator who wants the old behaviour can still have it.
+    old = Policy(require_profile_confirmation=False, require_history_to_ban=False)
+    assert old.decide(v(R), v(C)).action is Action.BAN
 
 
 @pytest.mark.parametrize(
@@ -87,3 +98,61 @@ def test_profile_confirmation_disabled():
 )
 def test_file_decision(risk, strikes, expected):
     assert file_decision(v(risk, "file"), strikes).action is expected
+
+
+# --- a first offence must not end in a ban ----------------------------------
+def test_a_newcomer_is_not_banned_on_one_red_flag_and_a_missing_avatar():
+    """The exact case seen in production: the model calls the message
+    RED_FLAG, the profile scores FIFTY_FIFTY for nothing but "no profile
+    photo", and the matrix bans. That is one detector plus a missing avatar,
+    against a member with no history and no invite link back."""
+    d = Policy().decide(
+        Verdict(Risk.RED_FLAG, "upfront money demand", "llm"),
+        Verdict(Risk.FIFTY_FIFTY, "no profile photo", "photo"),
+        strikes=0, trusted=False,
+    )
+    assert d.action is Action.DELETE
+    assert "first offence" in d.reason
+
+
+def test_both_detectors_red_still_bans_a_newcomer():
+    """The cap asks for corroboration, not for patience. Two independent
+    signals agreeing is corroboration, so it is not weakened."""
+    d = Policy().decide(
+        Verdict(Risk.RED_FLAG, "advance-fee pitch", "llm"),
+        Verdict(Risk.RED_FLAG, "scam bio and linked channel", "profile"),
+        strikes=0, trusted=False,
+    )
+    assert d.action is Action.BAN
+
+
+def test_a_prior_strike_restores_the_ban():
+    """A repeat offender has the history the first-offence cap asks for, so
+    the second attempt is treated exactly as before."""
+    d = Policy().decide(
+        Verdict(Risk.RED_FLAG, "upfront money demand", "llm"),
+        Verdict(Risk.FIFTY_FIFTY, "no profile photo", "photo"),
+        strikes=1, trusted=False,
+    )
+    assert d.action is Action.BAN
+
+
+def test_the_cap_still_takes_the_strike():
+    """Downgrading the action must not also forgive it — without the strike,
+    a scammer could repeat the same message forever and never escalate."""
+    d = Policy().decide(
+        Verdict(Risk.RED_FLAG, "upfront money demand", "llm"),
+        Verdict(Risk.FIFTY_FIFTY, "no profile photo", "photo"),
+        strikes=0, trusted=False,
+    )
+    assert d.add_strike is True
+
+
+def test_ban_on_first_offence_can_be_restored():
+    """The old behaviour stays available for an operator who wants it."""
+    d = Policy(require_history_to_ban=False).decide(
+        Verdict(Risk.RED_FLAG, "upfront money demand", "llm"),
+        Verdict(Risk.FIFTY_FIFTY, "no profile photo", "photo"),
+        strikes=0, trusted=False,
+    )
+    assert d.action is Action.BAN

@@ -12,10 +12,29 @@ Base matrix (no history):
     FIFTY_FIFTY       | REVIEW     REVIEW        DELETE
     RED_FLAG          | DELETE     BAN           BAN
 
-Then two adjustments:
+Then three adjustments:
   - trusted user  -> never worse than REVIEW (a long-standing member is not
     getting auto-banned over one bad-looking sentence)
   - repeat strikes-> escalate one step per threshold reached
+  - first offence -> never worse than DELETE, unless BOTH the message and the
+    profile are RED_FLAG. See `require_history_to_ban` below.
+
+WHY A FIRST OFFENCE IS CAPPED. The (RED_FLAG, FIFTY_FIFTY) cell bans, and in
+practice the commonest way to score FIFTY_FIFTY on the profile is "no profile
+photo" — which describes a great many ordinary newcomers. So a genuine new
+member whose first message the model misreads was one misfire away from a ban,
+with the admin told only afterwards, and no way back into a private group
+without an invite link.
+
+Trust does not help them: it takes TRUST_AFTER_MESSAGES posts to earn, and this
+is their first. So the newest member — the one with the least standing to lose
+and the least recourse — carried the most risk in the whole matrix.
+
+The cap asks for one of two things before a ban: a prior strike (they have done
+this before) or a RED_FLAG profile (two independent detectors agree, not one
+detector plus a missing avatar). A real scammer clears that bar almost
+immediately — they rarely stop at one message — while an ordinary member whose
+first post is misjudged loses the message and stays in the group.
 """
 from dataclasses import dataclass
 
@@ -62,10 +81,14 @@ class Policy:
         require_profile_confirmation: bool = True,
         strikes_to_escalate: int = 2,
         trusted_ceiling: Action = Action.REVIEW,
+        require_history_to_ban: bool = True,
+        first_offence_ceiling: Action = Action.DELETE,
     ) -> None:
         self._require_profile = require_profile_confirmation
         self._strikes_to_escalate = max(strikes_to_escalate, 1)
         self._trusted_ceiling = trusted_ceiling
+        self._require_history_to_ban = require_history_to_ban
+        self._first_offence_ceiling = first_offence_ceiling
 
     def decide(
         self,
@@ -90,9 +113,11 @@ class Policy:
         if not self._require_profile:
             # Profile confirmation disabled: judge on content alone.
             action = Action.BAN if content.risk is Risk.RED_FLAG else Action.REVIEW
+            prof_risk = None
             notes.append("profile-confirmation off")
         else:
             prof = profile or Verdict(Risk.CLEAN, "profile not checked", "profile")
+            prof_risk = prof.risk
             action = _BASE[(content.risk, prof.risk)]
             notes.append(f"profile={prof.risk.value}")
 
@@ -101,6 +126,20 @@ class Policy:
         if steps and action is not Action.NONE:
             action = _escalate(action, steps)
             notes.append(f"strikes={strikes} (+{steps})")
+
+        # First offence: one detector plus a missing avatar is not enough to
+        # remove someone permanently. Either they have done this before, or
+        # both signals must independently say RED_FLAG. See the module
+        # docstring for why the newest member was the most exposed.
+        if self._require_history_to_ban and action.bans and strikes == 0:
+            both_red = (content.risk is Risk.RED_FLAG
+                        and prof_risk is Risk.RED_FLAG)
+            if not both_red:
+                capped = _cap(action, self._first_offence_ceiling)
+                if capped is not action:
+                    notes.append(
+                        f"first offence: {action.value}->{capped.value}")
+                action = capped
 
         # Trust cap comes LAST so it overrides strike escalation. A member with
         # a long clean record gets a human look, never a silent auto-ban.
