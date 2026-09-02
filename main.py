@@ -268,7 +268,7 @@ def main() -> None:
     logging.getLogger("qalqon").info(
         "starting %s | photo:%s | channel-deep-scan:%s | db:%s | "
         "strikes-to-escalate:%s | trust-after:%s msgs | strike-decay:%s | "
-        "skip-admins:%s | autonomy:%s | digest:%.0fs",
+        "first-offence:%s | skip-admins:%s | autonomy:%s | digest:%.0fs",
         mode,
         "on" if settings.hf_token else "off",
         "on" if mtproto.available else "off",
@@ -276,6 +276,10 @@ def main() -> None:
         settings.strikes_to_escalate,
         settings.trust_after_messages,
         f"{settings.strike_decay_days}d" if settings.strike_decay_days else "never",
+        # Says what HAPPENS, not which flag is set: "ban_on_first_offence:off"
+        # would need the reader to know what the default even is, at the moment
+        # they are checking whether a deploy landed.
+        "can-ban" if settings.ban_on_first_offence else "delete-only",
         "on" if settings.skip_group_admins else "off",
         autonomy.value,
         settings.digest_interval,
