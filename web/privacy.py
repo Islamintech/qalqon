@@ -44,7 +44,11 @@ CSS = """
 
 /* ---------- body ---------- */
 .pv main{max-width:var(--max);margin:0 auto;padding:52px 28px 20px}
-.pv section{margin-bottom:52px}
+/* landing.CSS is on this page too for the header and footer, and its
+   `.lp section{max-width:1100px;padding:90px 28px}` would otherwise apply to
+   every section here — 90px of its padding on top of the 52px below, so the
+   page read as six blocks marooned in whitespace. Reset, don't inherit. */
+.pv section{max-width:none;padding:0;margin:0 0 52px}
 .pv h2{font-size:21px;font-weight:680;letter-spacing:-.022em;margin:0 0 8px;
   display:flex;align-items:center;gap:10px}
 .pv h2 .ic{color:var(--accent);flex:none}
