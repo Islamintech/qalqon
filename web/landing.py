@@ -327,22 +327,22 @@ def page(logo: str, signed_in: bool, theme: str = "",
   <div class="sec-head">
     <div class="eyebrow">The problem</div>
     <h2>The scam and the honest post look identical.</h2>
-    <p class="lead">Real communities talk about money constantly — job offers,
-    buying and selling, splitting bills, exchanging currency. A filter tuned to
-    flag those buries the group's purpose in false alarms, and eventually
-    removes the members who post most usefully. Measured against real traffic,
-    a generic ruleset flagged four of every fifteen legitimate posts, and
-    banned two of them outright.</p>
+    <p class="lead">Real communities talk about money constantly — buying and
+    selling, splitting bills, arranging payments, helping each other out. A
+    filter tuned to flag those buries the group's purpose in false alarms, and
+    eventually removes the members who post most usefully. Measured against
+    real traffic, a generic ruleset flagged four of every fifteen legitimate
+    posts, and banned two of them outright.</p>
   </div>
   <div class="grid g2">
     <div class="msg ok"><span class="tag">{render.icon("check", 12)}Left alone</span>
-      <div class="txt">“Anyone got a spare shift tomorrow? Happy to cover it —
-      message me”</div>
+      <div class="txt">“Anyone still selling the spare monitor? Happy to pay
+      your price — message me”</div>
       <div class="cap">Every keyword here appears in scams too. Nothing is
       being asked of anyone, so nothing happens.</div></div>
     <div class="msg bad"><span class="tag">{render.icon("ban", 12)}Removed</span>
-      <div class="txt">“I can get you the job — just send the 300 deposit
-      first and I'll confirm today”</div>
+      <div class="txt">“I've got one — just send the 300 deposit first and
+      I'll ship it today”</div>
       <div class="cap">Same subject, same tone. But money is demanded before
       anything is delivered.</div></div>
   </div>
@@ -365,8 +365,8 @@ def page(logo: str, signed_in: bool, theme: str = "",
   <div class="pipe">{_pipeline()}</div>
   <div class="grid g3">
     <div class="box"><span class="ico">{render.icon("context", 21)}</span><h3>Context-aware</h3>
-      <p>The model is told what is normal for the community it guards, so a
-      job post quoting a daily rate reads as recruitment rather than an
+      <p>The model is told what is normal for the community it guards, so an
+      ordinary post quoting a price reads as everyday trade rather than an
       earnings promise.</p></div>
     <div class="box"><span class="ico">{render.icon("link", 21)}</span><h3>Structural link checks</h3>
       <p>Homographs, typosquats, credentials-in-URL and buried double
