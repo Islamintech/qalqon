@@ -5,4 +5,6 @@ __pycache__/
 *.session
 *.session-journal
 qalqon.db
+qalqon.db-shm
+qalqon.db-wal
 .pytest_cache/
