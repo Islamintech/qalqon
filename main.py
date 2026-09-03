@@ -13,7 +13,7 @@ from models import (
     BurstDetector, AdminCache, Autonomy, ModerationModel,
 )
 from views import TelegramView, AlertBatcher, DigestReporter, Heartbeat
-from controllers import ModerationController, AdminController
+from controllers import ModerationController, AdminController, OnboardingController
 
 logging.basicConfig(
     level=logging.INFO,
@@ -161,6 +161,7 @@ def main() -> None:
         admin_cache=AdminCache(ttl=settings.admin_cache_ttl),
         skip_group_admins=settings.skip_group_admins,
     )
+    onboarding = OnboardingController(view, settings.web_base_url)
     admin = AdminController(
         store, view, settings.admin_chat_id, digest=digest, model=model
     )
@@ -230,6 +231,10 @@ def main() -> None:
         .build()
     )
 
+    # /start is public: it is how a group admin installs the bot, so it
+    # cannot sit behind the admin check the other commands use.
+    app.add_handler(CommandHandler("start", onboarding.start))
+
     # Admin commands first — a /command must never fall through to moderation.
     for name, handler in (
         ("help", admin.help),
@@ -262,6 +267,15 @@ def main() -> None:
         MessageHandler(
             filters.StatusUpdate.NEW_CHAT_MEMBERS, controller.handle_new_members
         )
+    )
+    # PTB runs only the FIRST matching handler per group, and the joiner
+    # screening above already claims this update — so the setup card is
+    # registered in a second group to let both react to the same arrival.
+    app.add_handler(
+        MessageHandler(
+            filters.StatusUpdate.NEW_CHAT_MEMBERS, onboarding.on_added
+        ),
+        group=1,
     )
 
     mode = "DRY-RUN (no deletes/bans)" if settings.dry_run else "LIVE"

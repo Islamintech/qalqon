@@ -41,7 +41,11 @@ Ishga tushirish: botni guruhga qo'shing va admin qiling.
 Paste the whole block in one message. These mirror `controllers/admin_controller.HELP`
 — change one, change the other, or the autocomplete starts lying.
 
+`/start` is listed first and is the only public one: it is what a group admin
+taps before anything else exists, so it must not sit behind the admin check.
+
 ```
+start - Botni guruhga qo'shish va sozlash
 stats - Ushbu guruh bo'yicha umumiy ma'lumot
 status - Foydalanuvchi yozuvi va so'nggi holatlar
 whitelist - Foydalanuvchiga ishonish, ogohlantirishlarni tozalash

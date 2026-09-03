@@ -29,6 +29,12 @@ class FakeBot:
         self.unbanned = []
         self.sent = []
         self.admins = set()
+        # The bot's own identity and permissions, for the setup check.
+        self.id = 999
+        self.username = "QalqonSafeBot"
+        self.bot_is_admin = True
+        self.rights = {"can_delete_messages": True, "can_restrict_members": True}
+        self.privacy_off = True
 
     async def delete_message(self, chat_id, message_id):
         self.deleted.append((chat_id, message_id))
@@ -54,9 +60,23 @@ class FakeBot:
         return [_M(uid) for uid in self.admins]
 
     async def get_chat_member(self, chat_id, user_id):
+        me = user_id == self.id
+        is_admin = (me and self.bot_is_admin) or user_id in self.admins
+        rights = self.rights if me else {}
+
         class M:
-            status = "administrator" if user_id in self.admins else "member"
+            status = "administrator" if is_admin else "member"
+
+        for name, value in rights.items():
+            setattr(M, name, value)
         return M()
+
+    async def get_me(self):
+        class Me:
+            pass
+
+        Me.can_read_all_group_messages = self.privacy_off
+        return Me()
 
 
 class FakeUser:
@@ -91,15 +111,17 @@ class FakeMessage:
         self.new_chat_members = []
         self.reply_to_message = None
         self.replies = []
+        self.markups = []
 
     async def reply_text(self, text, **kw):
         self.replies.append(text)
+        self.markups.append(kw.get("reply_markup"))
 
 
 class FakeUpdate:
     def __init__(
         self, message=None, user=None, chat_id=-1001, callback_query=None,
-        edited=False,
+        edited=False, chat_type="group", chat_title="Test Group",
     ):
         self.effective_message = message
         self.effective_user = user or (message.from_user if message else None)
@@ -112,6 +134,8 @@ class FakeUpdate:
 
         class Chat:
             id = chat_id
+            type = chat_type
+            title = chat_title
         self.effective_chat = Chat()
 
 

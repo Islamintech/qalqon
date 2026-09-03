@@ -609,6 +609,50 @@ Note this is separate from `AlertBatcher`, which is a pressure valve for when
 *live* alerts arrive faster than a human can read them. The digest is the normal
 path for things nobody needs to see immediately.
 
+## Installing it in a group
+
+`/start` is the whole install path, and it is the one command that is **not**
+behind the admin check — it is what a group admin taps before anything else
+exists.
+
+**In private** it explains the job and offers one button. The button is a
+`?startgroup=true&admin=delete_messages+restrict_members` deep link, so
+Telegram asks for both rights *in the same dialog as the invite*. A separate
+"now go promote it" step is the one people skip, and skipping it is how a bot
+ends up sitting in a group reading nothing.
+
+**In a group** it is a diagnosis rather than a greeting — asked live, because
+rights are changed in Telegram's own UI, which tells the bot nothing:
+
+```
+🛡 Qalqon setup — Crypto Signals
+
+✅ Administrator
+✅ Delete messages
+❌ Ban users — a scammer could not be removed
+
+Fix: Ban users. Then send /start again.
+```
+
+The same card is sent **unprompted the moment the bot is added**, since that is
+the one time the admin is certainly looking. It is registered in a second
+handler group: PTB runs only the first matching handler per group, and joiner
+screening already claims that update.
+
+Three things it reports that a bot normally cannot tell you about itself:
+
+- **Not an administrator** — it can read the group but not act in it.
+- **A missing right, named by what it costs** ("scam posts would stay up"), not
+  by its API flag. `can_restrict_members: false` is not something an admin can
+  act on.
+- **Privacy mode**, read from `getMe`. That one is the bot owner's setting
+  rather than the group's, but its symptom is the bot doing nothing at all —
+  which is exactly what an admin would otherwise blame on rights.
+
+And a fully permitted bot in `DRY_RUN` never reports "Ready": permitted but
+changing nothing is not the same as protecting the group, and conflating them
+would hand someone a false sense of cover.
+
 ## Running it for real
 
 See [deploy/DEPLOY.md](deploy/DEPLOY.md) for VPS setup (systemd unit, hardening,
