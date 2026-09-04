@@ -330,9 +330,9 @@ def page(logo: str, signed_in: bool, theme: str = "",
     <p class="lead">Real communities talk about money constantly — buying and
     selling, splitting bills, arranging payments, helping each other out. A
     filter tuned to flag those buries the group's purpose in false alarms, and
-    eventually removes the members who post most usefully. Measured against
-    real traffic, a generic ruleset flagged four of every fifteen legitimate
-    posts, and banned two of them outright.</p>
+    eventually removes the members who post most usefully. An early version of
+    this bot flagged four of the fifteen real messages now kept as its test
+    corpus, and banned two of them outright.</p>
   </div>
   <div class="grid g2">
     <div class="msg ok"><span class="tag">{render.icon("check", 12)}Left alone</span>
