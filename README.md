@@ -451,8 +451,13 @@ Three credentials, four settings. Work top to bottom.
 only commands, so it would sit in the group moderating nothing. This is the most
 commonly missed step.
 
-**2. Groq key** — console.groq.com, free. Model `llama-3.3-70b-versatile`
-(current, and the documented replacement for several retired models).
+**2. Groq key** — console.groq.com, free. Model
+`openai/gpt-oss-safeguard-20b`, which is purpose-built for safety
+classification and is the best-calibrated of the available models on
+AMBIGUOUS messages — it returns FIFTY_FIFTY (-> a human decides) where the
+general models jump to RED_FLAG (-> the bot acts). That is what sets the
+false-positive rate, so it is the model choice that matters most.
+`openai/gpt-oss-120b` is the stronger general alternative.
 
 **3. HF token** *(optional — profile-photo screening)* — must be a
 **fine-grained** token with the **"Make calls to Inference Providers"**
@@ -486,7 +491,7 @@ They do different jobs and do not overlap:
 
 | provider | model | judges |
 |---|---|---|
-| Groq | `llama-3.3-70b-versatile` | message **text** |
+| Groq | `openai/gpt-oss-safeguard-20b` | message **text** |
 | HF | `Falconsai/nsfw_image_detection` | the **profile photo** |
 
 `Falconsai/nsfw_image_detection` is HF's own documented example model for
