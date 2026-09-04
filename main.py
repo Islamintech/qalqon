@@ -136,6 +136,7 @@ def main() -> None:
         llm_client=LLMClient(
             settings.groq_api_key, settings.groq_model,
             cache_ttl=settings.llm_cache_ttl,
+            token_limit_per_minute=settings.groq_token_limit_per_minute,
         ),
         profile_analyzer=profile_analyzer,
         link_analyzer=LinkAnalyzer(blocklist=settings.blocked_domains),

@@ -29,6 +29,7 @@ from dataclasses import dataclass
 
 from groq import AsyncGroq
 
+from .rate_limiter import TokenBucket
 from .verdict import Verdict, Risk
 
 log = logging.getLogger("qalqon.llm")
@@ -113,6 +114,22 @@ def _normalize(text: str) -> str:
     return re.sub(r"\s+", " ", text.strip().lower())
 
 
+# What a reply costs on top of the prompt. Measured at ~200 completion tokens
+# on the recorded traffic; rounded up, because under-reserving is what the
+# pacing exists to prevent and the difference is settled afterwards anyway.
+_COMPLETION_ALLOWANCE = 250
+
+
+def _estimate_tokens(system: str, user: str) -> int:
+    """Roughly what this call will cost, BEFORE it is sent.
+
+    Four characters to a token is crude, but the alternative is shipping a
+    tokenizer for the sole purpose of pacing, and the estimate is reconciled
+    against the real usage the moment the reply lands.
+    """
+    return (len(system) + len(user)) // 4 + 60 + _COMPLETION_ALLOWANCE
+
+
 def _retryable(exc: Exception) -> bool:
     blob = f"{type(exc).__name__} {exc}".lower()
     return any(token in blob for token in _RETRYABLE)
@@ -127,6 +144,7 @@ class LLMClient:
         cache_size: int = 512,
         max_concurrency: int = 4,
         max_attempts: int = 3,
+        token_limit_per_minute: int = 0,
     ) -> None:
         self._client = AsyncGroq(api_key=api_key)
         self._model = model
@@ -134,6 +152,11 @@ class LLMClient:
         self._max = cache_size
         self._cache: dict[str, tuple[float, Verdict]] = {}
         self._sem = asyncio.Semaphore(max_concurrency)
+        # Concurrency is not a budget: four in flight at ~0.8s a call is
+        # some 290 requests a minute, against a free-tier ceiling nearer
+        # eight. The bucket is what actually enforces the limit; the
+        # semaphore just stops us opening sockets we cannot use.
+        self._bucket = TokenBucket(token_limit_per_minute)
         self._max_attempts = max(max_attempts, 1)
         self.calls = 0
         self.cache_hits = 0
@@ -174,6 +197,11 @@ class LLMClient:
         for attempt in range(self._max_attempts):
             self._last_attempts = attempt + 1
             try:
+                estimate = _estimate_tokens(SYSTEM_PROMPT, user_content)
+                # Wait for room rather than discover the ceiling as a 429. A
+                # call delayed two seconds succeeds; the same call sent now is
+                # three retries and a verdict marked degraded.
+                await self._bucket.acquire(estimate)
                 async with self._sem:
                     self.calls += 1
                     resp = await self._client.chat.completions.create(
@@ -194,6 +222,9 @@ class LLMClient:
                     reasoning_tokens=getattr(details, "reasoning_tokens", 0) or 0,
                     latency_ms=int((time.perf_counter() - started) * 1000),
                     queue_ms=int((getattr(usage, "queue_time", 0) or 0) * 1000),
+                )
+                self._bucket.charge(
+                    self.last.prompt_tokens + self.last.completion_tokens - estimate
                 )
                 data = json.loads(resp.choices[0].message.content)
                 risk = Risk(str(data.get("risk", "CLEAN")).upper())

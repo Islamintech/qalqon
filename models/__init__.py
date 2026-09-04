@@ -3,6 +3,7 @@ from .policy import Policy, Decision, file_decision
 from .store import Store, UserRecord
 from .keyword_filter import KeywordFilter
 from .llm_client import LLMClient
+from .rate_limiter import TokenBucket
 from .profile_analyzer import ProfileAnalyzer
 from .vision_client import VisionClient
 from .file_scanner import FileScanner
@@ -22,7 +23,8 @@ from .mtproto_scanner import MTProtoScanner
 
 __all__ = [
     "Verdict", "Risk", "Action", "Policy", "Decision", "file_decision",
-    "Store", "UserRecord", "KeywordFilter", "LLMClient", "ProfileAnalyzer",
+    "Store", "UserRecord", "KeywordFilter", "LLMClient",
+    "TokenBucket", "ProfileAnalyzer",
     "VisionClient", "FileScanner", "ChannelAnalyzer", "MTProtoScanner", "LinkAnalyzer", "extract_links", "BurstDetector", "AdminCache", "Autonomy", "ModerationModel", "IncomingMessage",
     "JoiningMember", "Attachment", "Observable", "Event", "MessageJudged",
     "MemberJoined", "RaidDetected", "DetectorDegraded", "CaseResolved",

@@ -620,6 +620,43 @@ Note this is separate from `AlertBatcher`, which is a pressure valve for when
 *live* alerts arrive faster than a human can read them. The digest is the normal
 path for things nobody needs to see immediately.
 
+## Pacing against the rate limit
+
+`GROQ_TOKEN_LIMIT_PER_MINUTE` used to be shown on the dashboard and enforced
+nowhere. The only thing standing between a busy minute and a wall of 429s was
+the concurrency semaphore — and concurrency is not a budget: four calls in
+flight at ~0.8s each is some 290 requests a minute, against a free-tier
+ceiling nearer eight. So the bot discovered its limit the one remaining way,
+by being rate-limited, in exactly the minute it could least afford to lose the
+model.
+
+`models/rate_limiter.py` is a token bucket, because the limit is per MINUTE. A
+group is quiet for long stretches and then everyone replies at once; a fixed
+delay would throttle the quiet stretch for nothing and still not describe the
+ceiling. The bucket lets a burst run until the allowance is genuinely spent,
+then paces.
+
+A call has to reserve budget *before* it is sent, when its cost is not yet
+known, so the reservation is an estimate (characters/4 plus a completion
+allowance) and the difference is settled against the real usage the moment the
+reply lands — over-estimates are refunded, under-estimates are paid by the
+next caller.
+
+Two details that are load-bearing rather than decorative:
+
+- **Credit does not accumulate past one minute.** Saving an hour of silence
+  would buy an hour-sized burst, which the provider will refuse. The ceiling
+  is a rate, not a quota.
+- **Comparisons carry an epsilon and waits have a floor.** Refilling for
+  exactly the deficit can land a hair short of it in floating point, so the
+  next delay computes as ~1e-16, the clock does not move enough to notice, and
+  the loop never exits — holding its lock with the event loop pinned, which
+  stalls every other message in the bot. That is a hang, not a slowdown; see
+  `test_a_long_run_never_spins_on_a_rounding_remainder`.
+
+Set it to `0` to disable pacing, for an unmetered plan or a limit nobody
+knows: throttling to a halt on a guess is worse than not pacing at all.
+
 ## Installing it in a group
 
 `/start` is the whole install path, and it is the one command that is **not**
