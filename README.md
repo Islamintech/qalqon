@@ -256,8 +256,14 @@ being an admin/owner of the group (verified live via `get_chat_member`).
 
 - **Keyword filter runs before the LLM**, as phase 1 intended.
 - **Identical text is cached** for `LLM_CACHE_TTL` seconds, so a spammer posting
-  the same line 30 times costs one call. Context-flavoured calls aren't cached —
-  one user's history must not colour another's verdict.
+  the same line 30 times costs one call. The sender prior is part of the cache
+  KEY rather than a reason to skip caching: one member's history must not colour
+  another's verdict, but a raid is many brand-new accounts posting one line, so
+  their prior is identical too and they collapse to a single call.
+  The prior is bucketed ("established member", "3 or more prior strikes") for
+  the same reason — an exact message count would make every key unique, which
+  is precisely how this cache was once dead in production without failing
+  anything. See `tests/test_llm_cache.py` and `tests/test_sender_prior.py`.
 - **Short chatter skips the model.** Under 12 characters with no link, mention
   or keyword hit ("ok", "thanks", "👍") cannot carry a scam pitch. Anything with
   a link goes to the model however short it is.

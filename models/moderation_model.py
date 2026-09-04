@@ -329,14 +329,34 @@ class ModerationModel(Observable):
 
     def _describe(self, record, trusted: bool, text: str = "") -> str:
         """A coarse sender prior for the model — tenure and strikes, never a
-        name it could be biased by."""
+        name it could be biased by.
+
+        Deliberately BUCKETED rather than exact. The model cannot use the
+        difference between 47 and 48 prior messages, but this string is part
+        of the verdict cache key, so an exact count made every key unique and
+        the cache never hit twice. Twenty raid accounts posting one line now
+        produce one identical prior, and so one paid call.
+        """
         if record.messages_seen == 0:
             sender = "SENDER CONTEXT: first message ever seen from this account."
         else:
-            sender = (
-                f"SENDER CONTEXT: {record.messages_seen} prior messages, "
-                f"{record.strikes} prior strikes, "
-                f"{'established member' if trusted else 'not yet established'}."
-            )
+            if trusted:
+                tenure = "established member"
+            elif record.messages_seen < 5:
+                tenure = "very new account, not yet established"
+            else:
+                tenure = "some history, not yet established"
+            # Capped: past the escalation threshold the exact tally changes
+            # nothing the model decides, and every distinct value would split
+            # the cache again.
+            if record.strikes == 0:
+                strikes = "no prior strikes"
+            elif record.strikes == 1:
+                strikes = "1 prior strike"
+            elif record.strikes == 2:
+                strikes = "2 prior strikes"
+            else:
+                strikes = "3 or more prior strikes"
+            sender = f"SENDER CONTEXT: {tenure}, {strikes}."
         links = self._links.describe(text) if text else ""
         return f"{sender}\n{links}" if links else sender

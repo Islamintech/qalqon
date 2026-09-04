@@ -213,7 +213,17 @@ class LLMClient:
         raise last if last else RuntimeError("llm call failed")
 
     async def analyze(self, text: str, context: str = "") -> Verdict:
-        key = hashlib.sha256(_normalize(text).encode()).hexdigest()
+        # The context is part of the QUESTION, so it belongs in the key rather
+        # than disqualifying the answer from being stored. Keying on text alone
+        # would let a long-standing member's verdict answer for a brand-new
+        # account saying the same thing; refusing to cache whenever a context
+        # was supplied — the previous behaviour — meant never caching at all,
+        # since the model always supplies one. A raid is many NEW accounts
+        # posting one line, so their context is identical too, which is
+        # precisely when this has to work.
+        key = hashlib.sha256(
+            json.dumps([_normalize(text), _normalize(context)]).encode()
+        ).hexdigest()
         cached = self._cache_get(key)
         if cached is not None:
             self.last = CallStats(model=self._model, cached=True)
@@ -223,10 +233,7 @@ class LLMClient:
         try:
             verdict = await self._call(user_content)
             self._consecutive_failures = 0
-            # Only cache verdicts that didn't depend on this user's context,
-            # otherwise one user's history would colour another's result.
-            if not context:
-                self._cache_put(key, verdict)
+            self._cache_put(key, verdict)
             return verdict
         except Exception as exc:
             self.failures += 1
