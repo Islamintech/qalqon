@@ -111,8 +111,8 @@ sudo deploy/refresh-cloudflare-ips.sh
 ## 6. Install the site
 
 ```bash
-sudo cp deploy/nginx-qalqon.conf /etc/nginx/sites-available/qalqon
-sudo ln -sf /etc/nginx/sites-available/qalqon /etc/nginx/sites-enabled/qalqon
+sudo cp deploy/nginx-qalqon.conf /etc/nginx/sites-available/qalqon-safe.uz
+sudo ln -sf /etc/nginx/sites-available/qalqon-safe.uz            /etc/nginx/sites-enabled/qalqon-safe.uz
 sudo nginx -t && sudo systemctl reload nginx
 ```
 
@@ -120,9 +120,15 @@ The site file is written for nginx 1.24 (`listen 443 ssl http2;`). On 1.25.1+
 that form is deprecated but still works; the modern spelling is a separate
 `http2 on;` directive.
 
-Note the installed filename: this host already serves the panel from a site
-file called `scamguard`, so overwrite **that** — copying to a new `qalqon`
-name would leave two server blocks claiming the same server_name.
+Install this **alongside** the existing `scamguard` site, not over it. That
+file claims `76.13.222.177.nip.io`; this one claims `qalqon-safe.uz`. Different
+server names, so nginx keeps them apart and nip.io stays reachable as a
+fallback while the new path is unproven — which matters, because if Cloudflare
+is misconfigured and nip.io is gone, there is no way into the panel at all.
+
+Retire nip.io only after the new domain works end to end (step 11). Until then
+it is a route to the dashboard that bypasses Cloudflare entirely, so it is a
+fallback with a deadline, not a permanent second door.
 
 ## 7. Do not cache the dashboard
 
@@ -174,15 +180,21 @@ alone already protects this site.
 ## 9. Finish the app side
 
 ```
-# /opt/qalqon/.env
+# ~/apps/qalqon/.env
 WEB_BASE_URL=https://qalqon-safe.uz
 ```
 
 ```bash
-sudo systemctl restart qalqon-web qalqon
+cd ~/apps/qalqon && docker compose up -d
 ```
 
-Both services: the bot builds its `/privacy` link from the same variable.
+`up -d`, not `restart`: compose reads `.env` through `env_file` when a
+container is *created*, so `docker compose restart` recycles the process with
+the old environment still baked in and the change appears to do nothing.
+
+Both containers come up, and both need to — the bot builds its `/privacy` link
+from the same variable, so restarting only the web container leaves it handing
+out a link to the old host.
 
 Then @BotFather → `/setdomain` → your bot → `qalqon-safe.uz`. The Telegram
 login widget checks the page's host against this and silently refuses to render
@@ -204,8 +216,28 @@ and your groups' private messages.
 Finally, confirm the audit log sees you and not Cloudflare:
 
 ```bash
-sudo journalctl -u qalqon-web -n 50 | grep 'token sign-in'
+docker compose logs web | grep 'token sign-in' | tail -5
 ```
 
 The address there must be your own public IP (`curl -s ifconfig.me`). If it is
 a `104.` / `172.64.` address, step 5 did not take effect.
+
+## 11. Retire nip.io
+
+Once `https://qalqon-safe.uz` works and you have signed in through it:
+
+```bash
+sudo rm /etc/nginx/sites-enabled/scamguard
+sudo nginx -t && sudo systemctl reload nginx
+sudo certbot delete --cert-name 76.13.222.177.nip.io
+```
+
+The `certbot delete` is not tidiness. Left in place, the renewal timer keeps
+trying to reissue a certificate for a hostname no enabled site serves, and
+starts mailing you failures every 60 days.
+
+Leaving the nip.io block enabled is worse than untidy: it answers on the origin
+IP with a browser-trusted certificate, so anyone who knows the name reaches the
+dashboard without passing through Cloudflare — no WAF, no edge rate limiting,
+and the real origin confirmed. Every protection in this runbook is bypassed by
+that one server block.
