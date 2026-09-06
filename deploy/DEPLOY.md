@@ -201,8 +201,10 @@ sudo -u qalqon /opt/qalqon/.venv/bin/pip install -r requirements-web.txt
 The Telegram login widget refuses to load on a domain the bot does not claim:
 
 ```
-/setdomain  ->  your bot  ->  panel.example.com
+/setdomain  ->  your bot  ->  qalqon-safe.uz
 ```
+
+Do this after DNS resolves — see [CLOUDFLARE.md](CLOUDFLARE.md) step 9.
 
 ## 3. Configure
 
@@ -211,7 +213,7 @@ In `.env`:
 ```
 WEB_ADMIN_IDS=1395418600          # comma-separated Telegram user ids
 WEB_BOT_USERNAME=you_are_safebot  # no @
-WEB_BASE_URL=https://panel.example.com
+WEB_BASE_URL=https://qalqon-safe.uz
 WEB_SESSION_SECRET=               # empty derives one from the bot token
 ```
 
@@ -226,19 +228,13 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now qalqon-web
 ```
 
-It binds to `127.0.0.1:8080` only. Put a reverse proxy in front for TLS —
-Caddy does certificates automatically:
+It binds to `127.0.0.1:8080` only. nginx in front terminates TLS and is the
+sole public entry point, with Cloudflare in front of that — the DNS, origin
+certificate, real-IP and cache steps are a runbook of their own:
 
-```
-# /etc/caddy/Caddyfile
-panel.example.com {
-    reverse_proxy 127.0.0.1:8080
-}
-```
+**→ [CLOUDFLARE.md](CLOUDFLARE.md)**
 
-```bash
-sudo apt install caddy && sudo systemctl reload caddy
-```
+Work through it now, then come back for the check below.
 
 Do **not** expose port 8080 directly. Without TLS the session cookie and every
 message shown travel in clear text.
@@ -249,7 +245,7 @@ message shown travel in clear text.
 curl -s localhost:8080/healthz          # {"ok":true}
 ```
 
-Then open `https://panel.example.com`, sign in with Telegram, and confirm you
+Then open `https://qalqon-safe.uz`, sign in with Telegram, and confirm you
 land on the dashboard. Signing in with a non-allow-listed account should be
 refused — worth testing once, because that check is the only thing between the
 internet and your groups' private messages.
