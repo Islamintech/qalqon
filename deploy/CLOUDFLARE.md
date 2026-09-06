@@ -116,8 +116,13 @@ sudo ln -sf /etc/nginx/sites-available/qalqon /etc/nginx/sites-enabled/qalqon
 sudo nginx -t && sudo systemctl reload nginx
 ```
 
-`nginx -t` failing on `http2 on;` means nginx is older than 1.25 — replace that
-line with `listen 443 ssl http2;` on the two listen lines instead.
+The site file is written for nginx 1.24 (`listen 443 ssl http2;`). On 1.25.1+
+that form is deprecated but still works; the modern spelling is a separate
+`http2 on;` directive.
+
+Note the installed filename: this host already serves the panel from a site
+file called `scamguard`, so overwrite **that** — copying to a new `qalqon`
+name would leave two server blocks claiming the same server_name.
 
 ## 7. Do not cache the dashboard
 
