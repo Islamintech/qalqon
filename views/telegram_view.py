@@ -15,7 +15,9 @@ the point of routing a borderline case to a human is that the human can resolve
 it in one tap. Resolving edits the message and drops the buttons so two admins
 cannot action the same case twice.
 """
+import asyncio
 import logging
+import time
 
 from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup
 
@@ -42,6 +44,38 @@ _ICON = {
     Action.DELETE: "🧹 Deleted",
     Action.BAN: "🚫 Removed",
 }
+
+# What the GROUP is told, by the signal that decided it — (Uzbek, English).
+# A category, never the detector's own reason: spelling out exactly what
+# tripped the filter is a how-to for the next attempt.
+_PUBLIC_REASON = {
+    "link": ("shubhali havola", "suspicious link"),
+    "file": ("xavfli fayl", "dangerous file"),
+    "keyword": ("firibgarlik belgilari", "signs of a scam"),
+    "llm": ("firibgarlik belgilari", "signs of a scam"),
+    "burst": ("ketma-ket ko'p xabar", "message flooding"),
+}
+_PUBLIC_REASON_DEFAULT = ("shubhali xabar", "suspicious message")
+
+# Telegram allows a bot about 20 messages a minute in one group. A raid can
+# produce more removals than that, and a notice must never be what gets the
+# bot rate-limited in the middle of cleaning up — so at most one per gap.
+NOTICE_GAP = 3.0
+
+
+def group_notice(action: Action, source: str) -> str:
+    """The note left in the group after a removal. No username: scam accounts
+    often ARE the advert (@crypto_profit_xx), and naming one repeats it."""
+    uz, en = _PUBLIC_REASON.get(source, _PUBLIC_REASON_DEFAULT)
+    if action.bans:
+        return (
+            f"🚫 Foydalanuvchi guruhdan chiqarildi.\nSabab: {uz}\n\n"
+            f"🚫 A user was removed from the group.\nReason: {en}"
+        )
+    return (
+        f"🧹 Xabar o'chirildi.\nSabab: {uz}\n\n"
+        f"🧹 A message was removed.\nReason: {en}"
+    )
 
 
 def build_callback(verb: str, chat_id: int, user_id: int) -> str:
@@ -96,6 +130,8 @@ class TelegramView:
         batcher: AlertBatcher | None = None,
         digest=None,
         autonomy=None,
+        notice_ttl: float = 0,
+        clock=time.monotonic,
     ) -> None:
         self._dry_run = dry_run
         self._admin_chat_id = admin_chat_id
@@ -103,6 +139,13 @@ class TelegramView:
         self._digest = digest
         self._autonomy = autonomy
         self._bot: Bot | None = None
+        # Seconds a removal notice stays in the group; 0 posts none.
+        self._notice_ttl = notice_ttl
+        self._clock = clock
+        self._last_notice: dict[int, float] = {}
+        # Notices still waiting to be cleaned up, so shutdown can do it now
+        # instead of leaving them in the group forever.
+        self._notices: dict[tuple[int, int], asyncio.Task] = {}
 
     # --- lifecycle ---------------------------------------------------------
     def attach(self, bot: Bot) -> None:
@@ -139,10 +182,15 @@ class TelegramView:
             )
 
     async def _on_judged(self, e: MessageJudged) -> None:
+        removed = banned = False
         if e.action.deletes:
-            await self.delete_message(e.chat_id, e.message_id)
+            removed = await self.delete_message(e.chat_id, e.message_id)
         if e.action.bans:
-            await self.kick_user(e.chat_id, e.user_id)
+            banned = await self.kick_user(e.chat_id, e.user_id)
+        # Only for what really happened: a dry run or a failed delete leaves
+        # the message up, and a notice saying otherwise would be a lie.
+        if (removed or banned) and not self._dry_run:
+            await self.post_notice(e.chat_id, e.action, e.content.source)
 
         live = self._autonomy is None or self._autonomy.alerts_live(e.action)
         if live or self._digest is None:
@@ -209,6 +257,49 @@ class TelegramView:
         except Exception as exc:
             log.warning("ban failed: %s", exc)
             return False
+
+    async def post_notice(self, chat_id: int, action: Action, source: str) -> None:
+        """Tell the group why something vanished, then tidy the note away."""
+        if not self._notice_ttl:
+            return
+        now = self._clock()
+        if now - self._last_notice.get(chat_id, float("-inf")) < NOTICE_GAP:
+            return
+        self._last_notice[chat_id] = now
+        try:
+            sent = await self._bot.send_message(
+                chat_id=chat_id, text=group_notice(action, source)
+            )
+        except Exception as exc:
+            log.warning("group notice failed: %s", exc)
+            return
+        message_id = getattr(sent, "message_id", None)
+        if message_id is None:
+            return
+
+        async def _expire() -> None:
+            try:
+                await asyncio.sleep(self._notice_ttl)
+                await self._bot.delete_message(chat_id=chat_id, message_id=message_id)
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                log.warning("could not remove group notice: %s", exc)
+            finally:
+                self._notices.pop((chat_id, message_id), None)
+
+        self._notices[(chat_id, message_id)] = asyncio.create_task(_expire())
+
+    async def clear_notices(self) -> None:
+        """At shutdown: remove pending notices now. Their timers die with the
+        process, and a notice nobody removes stays in the group for good."""
+        pending, self._notices = self._notices, {}
+        for (chat_id, message_id), task in pending.items():
+            task.cancel()
+            try:
+                await self._bot.delete_message(chat_id=chat_id, message_id=message_id)
+            except Exception as exc:
+                log.warning("could not remove group notice: %s", exc)
 
     async def unban_user(self, chat_id: int, user_id: int) -> bool:
         if self._dry_run:

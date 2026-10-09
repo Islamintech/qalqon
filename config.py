@@ -95,6 +95,10 @@ class Settings:
     autonomy: str = os.getenv("AUTONOMY", "assisted")
     # Seconds between digest summaries of routine, already-handled actions.
     digest_interval: float = float(os.getenv("DIGEST_INTERVAL", "21600"))
+    # After a real delete or ban, the bot posts the reason in the group
+    # (Uzbek + English) and removes that note after this many seconds, so a
+    # raid does not leave a wall of them behind. 0 posts no notice at all.
+    group_notice_ttl: float = float(os.getenv("GROUP_NOTICE_TTL", "60"))
 
     # Proof of life. The signal you act on is the ABSENCE of the daily ping,
     # so it is sent on a schedule regardless of activity. 0 disables it.

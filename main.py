@@ -159,6 +159,7 @@ def main() -> None:
         ),
         digest=digest,
         autonomy=autonomy,
+        notice_ttl=settings.group_notice_ttl,
     )
 
     # --- MODEL: every rule and all state. Knows nothing about Telegram. ---
@@ -260,6 +261,7 @@ def main() -> None:
             await heartbeat.shutdown(_send_digest)
         await digest.stop(_send_digest)
         await view.flush_alerts()
+        await view.clear_notices()
 
     async def _post_shutdown(app: Application) -> None:
         await mtproto.stop()
