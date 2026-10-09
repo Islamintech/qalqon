@@ -1,5 +1,7 @@
 """Entry point. Wires the MVC pieces together and starts the bot."""
 import logging
+import time
+from collections import deque
 
 from telegram.error import Conflict, NetworkError, TimedOut
 from telegram.ext import (
@@ -47,6 +49,37 @@ MODERATED_CONTENT = (
 )
 
 
+class ConflictGuard:
+    """Tells a real second instance apart from a one-off Conflict.
+
+    Telegram answers 409 Conflict when another getUpdates is polling the same
+    token. A real second instance does that on nearly every poll, because each
+    one keeps cutting the other's long poll short. But a single 409 also shows
+    up after a network drop, when our own abandoned long poll is still open on
+    Telegram's side — and shutting down on that cost a restart every time the
+    network blinked. So: tolerate a lone Conflict, stop on a sustained run.
+    """
+
+    def __init__(
+        self, threshold: int = 3, window: float = 120.0, clock=time.monotonic
+    ) -> None:
+        self._threshold = threshold
+        self._window = window
+        self._clock = clock
+        self._seen: deque[float] = deque()
+
+    def record(self) -> bool:
+        """Note one Conflict; True once they are frequent enough to be real."""
+        now = self._clock()
+        self._seen.append(now)
+        while self._seen and now - self._seen[0] > self._window:
+            self._seen.popleft()
+        return len(self._seen) >= self._threshold
+
+
+_conflicts = ConflictGuard()
+
+
 async def on_error(update: object, context) -> None:
     """Global error handler.
 
@@ -54,15 +87,19 @@ async def on_error(update: object, context) -> None:
     and an unrecoverable condition repeats forever at the poll interval until
     the log is unreadable.
 
-    Conflict is special: it means ANOTHER instance is polling this same bot
-    token. Two moderators acting on one chat is actively harmful — duplicate
-    bans, doubled strikes, two alerts per message — and it cannot resolve
-    itself, so we stop rather than fight over the update stream.
+    Conflict is special: sustained, it means ANOTHER instance is polling this
+    same bot token. Two moderators acting on one chat is actively harmful —
+    duplicate bans, doubled strikes, two alerts per message — and it cannot
+    resolve itself, so we stop rather than fight over the update stream.
     """
     err = context.error
     log = logging.getLogger("qalqon")
 
     if isinstance(err, Conflict):
+        if not _conflicts.record():
+            # PTB retries the poll on its own; a stale connection clears itself.
+            log.warning("Conflict from Telegram, retrying (likely a stale poll): %s", err)
+            return
         log.critical(
             "ANOTHER INSTANCE of this bot is already running (Conflict). "
             "Two instances would double every ban and strike. Shutting down — "
@@ -208,9 +245,11 @@ def main() -> None:
             )
             await heartbeat.start(_send_digest)
 
-    async def _post_shutdown(app: Application) -> None:
-        # Emit any pending digest before going down, so a raid's last alerts
-        # are not lost with the process.
+    async def _post_stop(app: Application) -> None:
+        # Everything that still SENDS goes here, not in post_shutdown: PTB
+        # shuts the bot's HTTP client down before post_shutdown runs, so a
+        # send from there always failed ("HTTPXRequest is not initialized")
+        # and the last digest, pending alerts and stop notice were all lost.
         # Emit a partial digest rather than discarding the period on restart.
         async def _send_digest(body: str) -> None:
             if settings.admin_chat_id:
@@ -221,6 +260,8 @@ def main() -> None:
             await heartbeat.shutdown(_send_digest)
         await digest.stop(_send_digest)
         await view.flush_alerts()
+
+    async def _post_shutdown(app: Application) -> None:
         await mtproto.stop()
         await store.stop()
 
@@ -228,6 +269,7 @@ def main() -> None:
         Application.builder()
         .token(settings.telegram_token)
         .post_init(_post_init)
+        .post_stop(_post_stop)
         .post_shutdown(_post_shutdown)
         .build()
     )
