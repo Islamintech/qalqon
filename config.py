@@ -1,4 +1,5 @@
 """Central configuration. All secrets come from environment variables."""
+import hashlib
 import os
 from dataclasses import dataclass
 from dotenv import load_dotenv
@@ -99,6 +100,10 @@ class Settings:
     # (Uzbek + English) and removes that note after this many seconds, so a
     # raid does not leave a wall of them behind. 0 posts no notice at all.
     group_notice_ttl: float = float(os.getenv("GROUP_NOTICE_TTL", "60"))
+    # The bot's answers to commands in a group (/start, /stats, /help ...) are
+    # for the admin who asked, so they are removed after this many seconds.
+    # The admin chat and private chats keep them. 0 keeps them everywhere.
+    group_reply_ttl: float = float(os.getenv("GROUP_REPLY_TTL", "60"))
 
     # Proof of life. The signal you act on is the ABSENCE of the daily ping,
     # so it is sent on a schedule regardless of activity. 0 disables it.
@@ -123,6 +128,19 @@ class Settings:
     # widget requires one). Empty disables it — a default-on second credential
     # is how panels end up unintentionally reachable. Must be 32+ chars.
     web_access_token: str = os.getenv("WEB_ACCESS_TOKEN", "")
+
+    # --- dashboard -> bot control channel --------------------------------
+    # The dashboard never writes the database or calls Telegram itself: it
+    # asks the BOT to act, over this private TCP port, and the bot runs the
+    # same code paths as its own commands. Never publish this port. Under
+    # docker compose the bot binds 0.0.0.0 on the internal network and the
+    # panel reaches it as "bot"; on one host both default to localhost.
+    control_bind: str = os.getenv("CONTROL_BIND", "127.0.0.1")
+    control_host: str = os.getenv("CONTROL_HOST", "127.0.0.1")
+    control_port: int = int(os.getenv("CONTROL_PORT", "8090"))
+    # Leave empty to derive one from the bot token (both processes read the
+    # same .env, so they agree without another value to keep in step).
+    control_secret: str = os.getenv("CONTROL_SECRET", "")
 
     # How long a moderation record — including up to 500 characters of the
     # message that triggered it — is kept. This is other people's private
@@ -166,3 +184,11 @@ class Settings:
 
 
 settings = Settings()
+
+
+def control_secret(s: Settings = settings) -> str:
+    """The shared secret for the dashboard -> bot channel: configured, or
+    derived from the bot token, so rotating the token also rotates this."""
+    if s.control_secret:
+        return s.control_secret
+    return hashlib.sha256(f"qalqon-control:{s.telegram_token}".encode()).hexdigest()

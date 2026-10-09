@@ -26,6 +26,8 @@ import logging
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 
+from .replies import reply
+
 log = logging.getLogger("qalqon.onboarding")
 
 # Requested in the invite dialog itself. `restrict_members` is what Telegram
@@ -82,10 +84,12 @@ def invite_markup(username: str, privacy_url: str = "") -> InlineKeyboardMarkup 
 
 class OnboardingController:
     def __init__(
-        self, view=None, web_base_url: str = "", admin_chat_id: str = ""
+        self, view=None, web_base_url: str = "", admin_chat_id: str = "",
+        reply_ttl: float = 0,
     ) -> None:
         self._view = view
         self._admin_chat_id = admin_chat_id
+        self._reply_ttl = reply_ttl
         self._privacy_url = f"{web_base_url.rstrip('/')}/privacy" if web_base_url else ""
 
     # --- entry points ----------------------------------------------------
@@ -104,7 +108,10 @@ class OnboardingController:
                 disable_web_page_preview=True,
             )
             return
-        await msg.reply_text(await self._readiness(context.bot, chat))
+        await reply(
+            update, await self._readiness(context.bot, chat), view=self._view,
+            admin_chat_id=self._admin_chat_id, ttl=self._reply_ttl,
+        )
 
     async def on_added(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Sent when Qalqon itself is the new member.
@@ -123,6 +130,10 @@ class OnboardingController:
         if not any(getattr(m, "id", None) == me for m in msg.new_chat_members):
             return
         card = await self._readiness(context.bot, chat)
+        # The "X added Qalqon" line is the bot's own trace in the group.
+        remove = getattr(self._view, "remove_service_message", None)
+        if remove:
+            await remove(chat.id, msg.message_id)
         if not self._admin_chat_id:
             log.info("added to %s; no ADMIN_CHAT_ID for the setup card:\n%s", chat.id, card)
             return

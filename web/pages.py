@@ -167,6 +167,7 @@ def groups(data) -> str:
             "name appears after its next message"
         )
         cards.append(
+            f'<div class="gitem">'
             f'<a class="gcard" href="/activity?chat={c["chat_id"]}">'
             f'<div class="gname">{name}</div><div class="gsub">{sub}</div>'
             f'<div class="gnums">'
@@ -179,6 +180,8 @@ def groups(data) -> str:
             f'<div class="gfoot">'
             f'{"Nothing has happened here yet" if quiet else "Last action " + ago(c["last_action"])}'
             f'</div></a>'
+            f'<a class="gact" href="/manage/leave?chat={c["chat_id"]}">Remove bot from group</a>'
+            f'</div>'
         )
     return (
         head("Groups", "Tap a group to see what happened there")
@@ -200,17 +203,59 @@ def members(data) -> str:
         f"<td class=dim>{e(group_name(chats, o['chat_id']))}</td>"
         f"<td class=num>{o['lifetime']}</td>"
         f"<td class=num dim>{o['messages_seen']}</td>"
-        f"<td>{_status_chip(o['status'])}</td></tr>"
+        f"<td>{_status_chip(o['status'])}</td>"
+        f"<td>{_member_actions(o)}</td></tr>"
         for o in offenders
     )
     return (
         head("Members", "Anyone Qalqon has acted on, most strikes first")
         + f'<div class="card wrap"><table><thead><tr><th>member</th>'
         f"<th>group</th><th>strikes</th><th>messages</th><th>status</th>"
-        f"</tr></thead><tbody>{rows}</tbody></table></div>"
+        f"<th></th></tr></thead><tbody>{rows}</tbody></table></div>"
         + '<div class="note">Strikes expire, so a member who behaves stops '
         "being escalated. “Trusted” members are never acted on "
         "automatically.</div>"
+    )
+
+
+def _action_form(verb: str, label: str, chat_id: int, user_id: int) -> str:
+    return (
+        f'<form method="post" action="/manage/{verb}">'
+        f'<input type="hidden" name="chat" value="{int(chat_id)}">'
+        f'<input type="hidden" name="user" value="{int(user_id)}">'
+        f'<button class="mini" type="submit">{label}</button></form>'
+    )
+
+
+def _member_actions(o) -> str:
+    """Carried out by the bot, not the panel — see web/control.py."""
+    buttons = [_action_form("forgive", "Forgive", o["chat_id"], o["user_id"])]
+    if o["status"] == "banned":
+        buttons.insert(0, _action_form("unban", "Unban", o["chat_id"], o["user_id"]))
+    return f'<div class="acts">{"".join(buttons)}</div>'
+
+
+def confirm(title: str, body: str, action: str, fields: dict, button: str,
+            danger: bool = False, back: str = "/app") -> str:
+    """A no-JavaScript "are you sure": a page with one form on it."""
+    hidden = "".join(
+        f'<input type="hidden" name="{e(k)}" value="{e(v)}">' for k, v in fields.items()
+    )
+    return (
+        head(title)
+        + f'<div class="card pad confirm">{body}'
+        f'<form method="post" action="{e(action)}">{hidden}'
+        f'<button class="btn{" danger" if danger else ""}" type="submit">{e(button)}</button>'
+        f'</form><a class="btn quiet" style="display:block;text-align:center" '
+        f'href="{e(back)}">Cancel</a></div>'
+    )
+
+
+def result(title: str, ok: bool, message: str, back: str, back_label: str) -> str:
+    return (
+        head(title)
+        + f'<div class="flash{"" if ok else " bad"}">{e(message)}</div>'
+        + f'<a href="{e(back)}">← {e(back_label)}</a>'
     )
 
 

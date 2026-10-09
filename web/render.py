@@ -366,6 +366,27 @@ summary:hover{color:var(--ink-2)}
   cursor:pointer}
 code{background:var(--raised);padding:2px 6px;border-radius:5px;font-size:12.5px}
 
+/* ---------- admin actions ---------- */
+.gitem{display:flex;flex-direction:column;gap:6px}
+.gitem .gcard{flex:1}
+.gact{align-self:flex-end;font-size:12px;color:var(--muted);padding:2px 4px}
+.gact:hover{color:var(--ban)}
+.acts{display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap}
+.acts form{margin:0}
+.mini{padding:5px 10px;border-radius:8px;border:1px solid var(--line);
+  background:var(--card);color:var(--ink);font-size:12px;font-weight:600;
+  cursor:pointer}
+.mini:hover{border-color:var(--accent)}
+.btn.danger{background:var(--ban)}
+.btn.quiet{background:var(--raised);color:var(--ink)}
+.confirm{max-width:520px}
+.confirm p{margin:0 0 6px}
+.flash{border-radius:11px;padding:13px 17px;margin-bottom:16px;
+  background:var(--good-bg);color:var(--good)}
+.flash.bad{background:var(--ban-bg);color:var(--ban)}
+.pill.off{background:var(--raised);color:var(--muted)}
+a.pill:hover{text-decoration:none;filter:brightness(.95)}
+
 @media (max-width:1080px){
   .topbar .in,main{padding-left:20px;padding-right:20px}
 }
@@ -451,7 +472,7 @@ FAVICON = (
 )
 
 
-def topbar(active: str, dry_run: bool, user_label: str,
+def topbar(active: str, dry_run: bool | None, user_label: str,
            theme: str = "", here: str = "/app") -> str:
     """Horizontal navigation.
 
@@ -464,10 +485,15 @@ def topbar(active: str, dry_run: bool, user_label: str,
         f"{icon(key)}<span>{name}</span></a>"
         for href, name, key in NAV
     )
-    mode = (
-        '<span class="pill dry">Dry run</span>' if dry_run
-        else '<span class="pill live">Live</span>'
-    )
+    # The bot's LIVE mode, asked of the bot itself; None means it did not
+    # answer, which is worth seeing on every page. A link: switching is there.
+    if dry_run is None:
+        mode = '<a class="pill off" href="/manage/mode">Bot offline</a>'
+    elif dry_run:
+        mode = '<a class="pill dry" href="/manage/mode">Dry run</a>'
+    else:
+        mode = '<a class="pill live" href="/manage/mode">Live</a>'
+
     return (
         f'<header class="topbar"><div class="in">'
         f'<a class="brand" href="/">{LOGO}<span>Qalqon</span></a>'

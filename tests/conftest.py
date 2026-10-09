@@ -12,6 +12,28 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from models import Store, Verdict, Risk  # noqa: E402
 
 
+class FakeBotControl:
+    """Stands in for the bot behind the dashboard's control channel, so web
+    tests never open a socket. `replies` maps op -> reply; `calls` records."""
+
+    def __init__(self):
+        self.calls = []
+        self.replies = {"status": {"ok": True, "dry_run": True}}
+
+    async def __call__(self, op, **fields):
+        self.calls.append((op, fields))
+        return self.replies.get(op, {"ok": True, "note": f"{op} done"})
+
+
+@pytest.fixture(autouse=True)
+def bot_control(monkeypatch):
+    from web import app as web_app
+
+    fake = FakeBotControl()
+    monkeypatch.setattr(web_app, "_bot", fake)
+    return fake
+
+
 @pytest.fixture
 async def store(tmp_path):
     s = Store(str(tmp_path / f"{uuid.uuid4().hex}.db"))

@@ -30,8 +30,8 @@ USER qalqon
 # must not wipe every strike, whitelist and ban record.
 VOLUME ["/data"]
 
-# No EXPOSE: the bot polls Telegram outbound and listens on nothing. There is
-# no inbound port to publish, and therefore nothing to collide with whatever
-# else is running on the host.
+# No EXPOSE: the bot polls Telegram outbound. Its one listener, the dashboard's
+# control port, is reached over the compose network and must never be
+# published, so there is still nothing to collide with on the host.
 
 CMD ["python", "main.py"]

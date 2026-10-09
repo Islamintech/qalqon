@@ -16,6 +16,8 @@ from models.store import Store, STATUS_NORMAL, STATUS_WHITELISTED
 from views import TelegramView
 from views.telegram_view import parse_callback, VERB_BAN, VERB_UNBAN
 
+from .replies import reply
+
 log = logging.getLogger("qalqon.admin")
 
 HELP = """Qalqon admin commands
@@ -37,13 +39,20 @@ From the admin chat, pass the chat first: /status <chat_id> <user_id>"""
 class AdminController:
     def __init__(
         self, store: Store, view: TelegramView, admin_chat_id: str = "",
-        digest=None, model=None,
+        digest=None, model=None, reply_ttl: float = 0,
     ) -> None:
         self._store = store
         self._view = view
         self._admin_chat_id = str(admin_chat_id or "")
         self._digest = digest
         self._model = model
+        self._reply_ttl = reply_ttl
+
+    async def _reply(self, update: Update, text: str, **kwargs):
+        return await reply(
+            update, text, view=self._view, admin_chat_id=self._admin_chat_id,
+            ttl=self._reply_ttl, **kwargs,
+        )
 
     # --- authorization ---------------------------------------------------
     async def _is_admin(self, update: Update, context, chat_id: int | None = None) -> bool:
@@ -90,7 +99,7 @@ class AdminController:
     async def help(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         if not await self._is_admin(update, context):
             return
-        await update.effective_message.reply_text(HELP)
+        await self._reply(update, HELP)
 
     async def stats(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         if not await self._is_admin(update, context):
@@ -100,7 +109,8 @@ class AdminController:
         s = await self._store.stats(scope)
         actions = ", ".join(f"{k}={v}" for k, v in sorted(s["actions"].items())) or "none"
         decay = f"{self._store.decay_days}d" if self._store.decay_days else "never"
-        await update.effective_message.reply_text(
+        await self._reply(
+            update,
             f"📊 Qalqon — {'all chats' if scope is None else f'chat {scope}'}\n"
             f"known users: {s['users']}\n"
             f"with active strikes: {s['users_with_strikes']} "
@@ -114,7 +124,8 @@ class AdminController:
     async def status(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         target = self._targets(update, context)
         if not target:
-            await update.effective_message.reply_text(
+            await self._reply(
+                update,
                 "usage: /status <user_id> (or reply to their message)"
             )
             return
@@ -141,7 +152,7 @@ class AdminController:
             lines += [f"  {e['action']} [{e['risk']}] {e['reason'][:80]}" for e in events]
         else:
             lines.append("recent: nothing on file")
-        await update.effective_message.reply_text("\n".join(lines))
+        await self._reply(update, "\n".join(lines))
 
     async def whitelist(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await self._set_status_cmd(update, context, STATUS_WHITELISTED, "whitelisted ✅")
@@ -152,18 +163,18 @@ class AdminController:
     async def forgive(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         target = self._targets(update, context)
         if not target:
-            await update.effective_message.reply_text("usage: /forgive <user_id>")
+            await self._reply(update, "usage: /forgive <user_id>")
             return
         chat_id, user_id = target
         if not await self._is_admin(update, context, chat_id):
             return
         await self._store.clear_strikes(chat_id, user_id)
-        await update.effective_message.reply_text(f"strikes cleared for {user_id}")
+        await self._reply(update, f"strikes cleared for {user_id}")
 
     async def unban(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         target = self._targets(update, context)
         if not target:
-            await update.effective_message.reply_text("usage: /unban <user_id>")
+            await self._reply(update, "usage: /unban <user_id>")
             return
         chat_id, user_id = target
         if not await self._is_admin(update, context, chat_id):
@@ -172,7 +183,8 @@ class AdminController:
         ok = await self._view.unban_user(chat_id, user_id)
         await self._store.set_status(chat_id, user_id, STATUS_NORMAL)
         await self._store.clear_strikes(chat_id, user_id)
-        await update.effective_message.reply_text(
+        await self._reply(
+            update,
             f"{'unbanned' if ok else 'unban failed for'} {user_id}"
         )
 
@@ -181,17 +193,19 @@ class AdminController:
             return
         args = context.args or []
         if not args:
-            await update.effective_message.reply_text(
+            await self._reply(
+                update,
                 f"mode: {'DRY-RUN (no deletes/bans)' if self._view.dry_run else 'LIVE'}"
             )
             return
         want = args[0].lower()
         if want not in ("on", "off"):
-            await update.effective_message.reply_text("usage: /dryrun on|off")
+            await self._reply(update, "usage: /dryrun on|off")
             return
         self._view.set_dry_run(want == "on")
         log.warning("dry_run set to %s by user %s", self._view.dry_run, update.effective_user.id)
-        await update.effective_message.reply_text(
+        await self._reply(
+            update,
             f"mode is now {'DRY-RUN' if self._view.dry_run else '⚠️ LIVE — real bans'}"
         )
 
@@ -200,30 +214,31 @@ class AdminController:
         if not await self._is_admin(update, context):
             return
         if self._digest is None:
-            await update.effective_message.reply_text("digests are not enabled")
+            await self._reply(update, "digests are not enabled")
             return
         pending = self._digest.pending
         if not pending:
-            await update.effective_message.reply_text(
+            await self._reply(
+                update,
                 "nothing pending — no automatic actions since the last digest"
             )
             return
 
         async def _send(body: str) -> None:
-            await update.effective_message.reply_text(body)
+            await self._reply(update, body)
 
         await self._digest.flush(_send)
 
     async def _set_status_cmd(self, update, context, status: str, label: str) -> None:
         target = self._targets(update, context)
         if not target:
-            await update.effective_message.reply_text("usage: <command> <user_id>")
+            await self._reply(update, "usage: <command> <user_id>")
             return
         chat_id, user_id = target
         if not await self._is_admin(update, context, chat_id):
             return
         await self._store.set_status(chat_id, user_id, status)
-        await update.effective_message.reply_text(f"user {user_id}: {label}")
+        await self._reply(update, f"user {user_id}: {label}")
 
     # --- inline buttons --------------------------------------------------
     async def on_button(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

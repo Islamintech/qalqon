@@ -318,7 +318,7 @@ def page(logo: str, signed_in: bool, theme: str = "",
   <div class="facts">
     <div class="fact"><b>6</b><span>independent signals</span></div>
     <div class="fact"><b>∞</b><span>languages</span></div>
-    <div class="fact"><b>440</b><span>automated tests</span></div>
+    <div class="fact"><b>468</b><span>automated tests</span></div>
     <div class="fact"><b>&lt;1s</b><span>typical decision</span></div>
   </div>
 </div></div>
@@ -429,7 +429,7 @@ def page(logo: str, signed_in: bool, theme: str = "",
     <span class="tech">FastAPI</span>
     <span class="tech">SQLite · WAL</span>
     <span class="tech">Docker</span>
-    <span class="tech">pytest · 440 tests</span>
+    <span class="tech">pytest · 468 tests</span>
     <span class="tech">nginx · Let's Encrypt</span>
   </div>
   <div class="grid g3">
@@ -438,10 +438,12 @@ def page(logo: str, signed_in: bool, theme: str = "",
       escalation matrix runs in seconds on every change.</p></div>
     <div class="box"><h3>Read-only dashboard</h3>
       <p>The web process opens the database read-only and mounts it read-only.
-      A bug here cannot alter moderation state.</p></div>
+      Its buttons ask the bot to act, so a bug here cannot alter moderation
+      state.</p></div>
     <div class="box"><h3>Deploys as one container</h3>
-      <p>No published ports — the bot polls outbound and listens on nothing, so
-      it adds no attack surface to the host.</p></div>
+      <p>No published ports — the bot polls outbound, and its only listener
+      stays on the private container network, so it adds no attack surface to
+      the host.</p></div>
   </div>
 </section>
 

@@ -8,14 +8,16 @@ from telegram.ext import (
     Application, CallbackQueryHandler, CommandHandler, MessageHandler, filters,
 )
 
-from config import settings
+from config import control_secret, settings
 from models import (
     KeywordFilter, LLMClient, ProfileAnalyzer, VisionClient, FileScanner,
     ChannelAnalyzer, MTProtoScanner, Policy, Store, LinkAnalyzer,
     BurstDetector, AdminCache, Autonomy, ModerationModel,
 )
 from views import TelegramView, AlertBatcher, DigestReporter, Heartbeat
-from controllers import ModerationController, AdminController, OnboardingController
+from controllers import (
+    ModerationController, AdminController, OnboardingController, ControlController,
+)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -201,11 +203,14 @@ def main() -> None:
         skip_group_admins=settings.skip_group_admins,
     )
     onboarding = OnboardingController(
-        view, settings.web_base_url, settings.admin_chat_id
+        view, settings.web_base_url, settings.admin_chat_id,
+        reply_ttl=settings.group_reply_ttl,
     )
     admin = AdminController(
-        store, view, settings.admin_chat_id, digest=digest, model=model
+        store, view, settings.admin_chat_id, digest=digest, model=model,
+        reply_ttl=settings.group_reply_ttl,
     )
+    control = ControlController(store, view, control_secret())
 
     # Open/close the DB and the Telethon client inside PTB's own event loop.
     async def _post_init(app: Application) -> None:
@@ -228,6 +233,7 @@ def main() -> None:
                 forgotten, settings.event_retention_days,
             )
         await mtproto.start()
+        await control.start(settings.control_bind, settings.control_port)
 
         async def _send_digest(body: str) -> None:
             if settings.admin_chat_id:
@@ -249,6 +255,7 @@ def main() -> None:
             await heartbeat.start(_send_digest)
 
     async def _post_stop(app: Application) -> None:
+        await control.stop()
         # Everything that still SENDS goes here, not in post_shutdown: PTB
         # shuts the bot's HTTP client down before post_shutdown runs, so a
         # send from there always failed ("HTTPXRequest is not initialized")

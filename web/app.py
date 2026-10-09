@@ -22,16 +22,16 @@ import sys
 import time
 from contextvars import ContextVar
 from datetime import datetime, timezone
-from urllib.parse import quote
+from urllib.parse import quote, urlparse
 
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from config import settings  # noqa: E402
+from config import control_secret, settings  # noqa: E402
 from models import store  # noqa: E402
-from web import landing, pages, pricing, queries, render  # noqa: E402
+from web import control, landing, pages, pricing, queries, render  # noqa: E402
 from web import privacy as privacy_page  # noqa: E402
 from web.auth import (  # noqa: E402
     TOKEN_USER, is_allowed, issue_session, read_session, session_secret,
@@ -92,6 +92,20 @@ THEMES = {"light", "dark"}
 # variable set once per request instead.
 _theme: ContextVar[str] = ContextVar("theme", default="")
 _here: ContextVar[str] = ContextVar("here", default="/")
+# The bot's mode as the BOT reports it (True = dry run, None = no answer).
+# settings.dry_run is only what .env said at start; /dryrun or the switch on
+# this panel changes the running bot, and the badge must show that.
+_mode: ContextVar[bool | None] = ContextVar("mode", default=None)
+
+# Pages that show the top bar, and so need the live mode.
+_SHELL_PATHS = ("/app", "/groups", "/members", "/activity", "/usage", "/manage")
+CONTROL_SECRET = control_secret()
+
+
+async def _bot(op: str, **fields) -> dict:
+    return await control.call(
+        settings.control_host, settings.control_port, CONTROL_SECRET, op, **fields
+    )
 
 
 @app.middleware("http")
@@ -102,11 +116,17 @@ async def _remember_theme(request: Request, call_next):
     if request.url.query:
         here = f"{here}?{request.url.query}"
     tok_h = _here.set(here)
+    mode = None
+    if request.url.path.startswith(_SHELL_PATHS) and _current_user(request):
+        status = await _bot("status")
+        mode = status.get("dry_run") if status.get("ok") else None
+    tok_m = _mode.set(mode)
     try:
         return await call_next(request)
     finally:
         _theme.reset(tok_t)
         _here.reset(tok_h)
+        _mode.reset(tok_m)
 
 
 @app.get("/theme")
@@ -134,7 +154,7 @@ def shell(body: str, user_id: int, active: str) -> HTMLResponse:
     label = "signed in with a token" if user_id == TOKEN_USER else f"ID {user_id}"
     return _document(
         f'<div class="shell">'
-        f"{render.topbar(active, settings.dry_run, label, _theme.get(), quote(_here.get(), safe='/?=&'))}"
+        f"{render.topbar(active, _mode.get(), label, _theme.get(), quote(_here.get(), safe='/?=&'))}"
         f"<main>{body}</main>"
         f"</div>"
     )
@@ -212,8 +232,9 @@ async def login(request: Request):
         f"<main class=login><div class=card><h1>Sign in to the dashboard</h1>"
         f"<p>Only the administrators of a watched group can open it.</p>"
         f"{''.join(blocks)}</div>"
-        f'<p class="foot">The dashboard is read-only. Moderation decisions are '
-        f"reviewed from Telegram, where the alert arrives.</p></main>"
+        f'<p class="foot">The dashboard reads the database read-only. Its '
+        f"buttons ask the bot to act, and every action is posted to the admin "
+        f"chat.</p></main>"
     )
 
 
@@ -452,3 +473,147 @@ async def healthz():
     """Unauthenticated on purpose: it reveals nothing and lets an uptime
     monitor check the panel itself."""
     return {"ok": True}
+
+
+# --- admin actions ------------------------------------------------------------
+# Every one of these is carried out BY THE BOT (see web/control.py): the panel
+# keeps its read-only database and never calls Telegram itself.
+
+def _same_origin(request: Request) -> bool:
+    """A form post must come from this site. The session cookie is SameSite=Lax,
+    which already keeps it off cross-site POSTs; this is the second lock."""
+    source = request.headers.get("origin") or request.headers.get("referer") or ""
+    return bool(source) and urlparse(source).netloc == request.headers.get("host", "")
+
+
+def _by(user_id: int) -> str:
+    return "token sign-in" if user_id == TOKEN_USER else f"Telegram user {user_id}"
+
+
+def _int(value) -> int | None:
+    text = str(value or "")
+    return int(text) if text.lstrip("-").isdigit() else None
+
+
+def _title(chat_id: int) -> str:
+    try:
+        conn = queries.connect(settings.db_path)
+        try:
+            return queries.chat_title(conn, chat_id) or f"group {chat_id}"
+        finally:
+            conn.close()
+    except Exception:
+        return f"group {chat_id}"
+
+
+def _done(user_id: int, title: str, reply: dict, back: str, back_label: str) -> HTMLResponse:
+    ok = bool(reply.get("ok"))
+    message = reply.get("note") if ok else reply.get("error", "failed")
+    return shell(pages.result(title, ok, f"{'Done' if ok else 'Not done'}: {message}",
+                              back, back_label), user_id, back)
+
+
+def _refused(user_id: int) -> HTMLResponse:
+    log.warning("dashboard action REJECTED: cross-site request for user %s", user_id)
+    return shell(pages.result("Not allowed", False,
+                              "This request did not come from the dashboard.",
+                              "/app", "Back to the dashboard"), user_id, "/app")
+
+
+@app.get("/manage/mode", response_class=HTMLResponse)
+async def manage_mode(request: Request):
+    user_id, redirect = _guard(request)
+    if redirect:
+        return redirect
+    mode = _mode.get()
+    if mode is None:
+        return shell(pages.result(
+            "Mode", False,
+            "The bot is not answering, so its mode cannot be read or changed. "
+            "Check that the bot container is running.", "/app", "Back"), user_id, "/app")
+    if mode:
+        body = ("<p>The bot is in <b>dry run</b>: it reports what it would do and "
+                "deletes or bans nothing.</p><p>Going live means scam messages are "
+                "really deleted and repeat offenders really banned.</p>")
+        button, value, danger = "Go live", "off", True
+    else:
+        body = ("<p>The bot is <b>live</b>: it deletes and bans for real.</p>"
+                "<p>Dry run stops all deleting and banning immediately.</p>")
+        button, value, danger = "Switch to dry run", "on", False
+    body += ("<p class=dim>Lasts until the bot restarts; after that it follows "
+             "<code>DRY_RUN</code> in <code>.env</code>.</p>")
+    return shell(pages.confirm("Mode", body, "/manage/mode", {"dry_run": value},
+                               button, danger=danger), user_id, "/app")
+
+
+@app.post("/manage/mode", response_class=HTMLResponse)
+async def manage_mode_post(request: Request):
+    user_id, redirect = _guard(request)
+    if redirect:
+        return redirect
+    if not _same_origin(request):
+        return _refused(user_id)
+    value = (await request.form()).get("dry_run")
+    if value not in ("on", "off"):
+        return _done(user_id, "Mode", {"ok": False, "error": "unknown mode"}, "/app", "Back")
+    reply = await _bot("dry_run", value=value == "on", by=_by(user_id))
+    log.info("dashboard: %s set dry_run=%s -> %s", _by(user_id), value, reply.get("ok"))
+    return _done(user_id, "Mode", reply, "/app", "Back to the dashboard")
+
+
+@app.get("/manage/leave", response_class=HTMLResponse)
+async def manage_leave(request: Request):
+    user_id, redirect = _guard(request)
+    if redirect:
+        return redirect
+    chat_id = _int(request.query_params.get("chat"))
+    if chat_id is None:
+        return RedirectResponse("/groups", status_code=303)
+    title = _title(chat_id)
+    body = (f"<p>Qalqon will <b>leave {pages.e(title)}</b> and stop protecting it.</p>"
+            "<p>Its history stays on the dashboard. To protect the group again, "
+            "a group admin adds the bot back.</p>")
+    return shell(pages.confirm("Remove bot from group", body, "/manage/leave",
+                               {"chat": chat_id}, "Remove bot", danger=True,
+                               back="/groups"), user_id, "/groups")
+
+
+@app.post("/manage/leave", response_class=HTMLResponse)
+async def manage_leave_post(request: Request):
+    user_id, redirect = _guard(request)
+    if redirect:
+        return redirect
+    if not _same_origin(request):
+        return _refused(user_id)
+    chat_id = _int((await request.form()).get("chat"))
+    if chat_id is None:
+        return RedirectResponse("/groups", status_code=303)
+    reply = await _bot("leave", chat_id=chat_id, by=_by(user_id))
+    log.info("dashboard: %s removed bot from %s -> %s", _by(user_id), chat_id, reply.get("ok"))
+    return _done(user_id, "Remove bot from group", reply, "/groups", "Back to groups")
+
+
+async def _member_action(request: Request, op: str, title: str):
+    user_id, redirect = _guard(request)
+    if redirect:
+        return redirect
+    if not _same_origin(request):
+        return _refused(user_id)
+    form = await request.form()
+    chat_id, target = _int(form.get("chat")), _int(form.get("user"))
+    if chat_id is None or target is None:
+        return RedirectResponse("/members", status_code=303)
+    reply = await _bot(op, chat_id=chat_id, user_id=target, by=_by(user_id))
+    log.info("dashboard: %s %s user %s in %s -> %s",
+             _by(user_id), op, target, chat_id, reply.get("ok"))
+    return _done(user_id, title, reply, "/members", "Back to members")
+
+
+@app.post("/manage/unban", response_class=HTMLResponse)
+async def manage_unban(request: Request):
+    return await _member_action(request, "unban", "Unban")
+
+
+@app.post("/manage/forgive", response_class=HTMLResponse)
+async def manage_forgive(request: Request):
+    return await _member_action(request, "forgive", "Forgive")

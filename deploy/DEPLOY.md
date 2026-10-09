@@ -179,12 +179,17 @@ going away, which nothing running *on* the VPS can.
 
 # The dashboard (optional)
 
-A read-only web panel: statistics, per-group breakdown, recent decisions, and
-how often a human overturned the bot.
+A web panel: statistics, per-group breakdown, recent decisions, and how often
+a human overturned the bot. Signed-in admins can also remove the bot from a
+group, unban or forgive a member, and switch dry run on or off.
 
 It runs as a **separate process** that opens the database **read-only**, so a
 bug or compromise in the web layer cannot corrupt moderation state, and the
-panel can crash without interrupting moderation.
+panel can crash without interrupting moderation. Its buttons do not act
+themselves: they ask the bot over a private port (`CONTROL_PORT`, 8090), with a
+secret derived from the bot token, and the bot posts every such action to the
+admin chat. Under docker compose that port stays on the compose network —
+never publish it. On a plain host both processes use `127.0.0.1`.
 
 **It renders real users' message text.** That is necessary for judging whether
 a flag was a false positive, but it makes the panel as sensitive as the groups

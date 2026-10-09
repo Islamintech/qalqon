@@ -143,8 +143,8 @@ class TelegramView:
         self._notice_ttl = notice_ttl
         self._clock = clock
         self._last_notice: dict[int, float] = {}
-        # Notices still waiting to be cleaned up, so shutdown can do it now
-        # instead of leaving them in the group forever.
+        # Bot messages still waiting to be cleaned up (notices and command
+        # replies), so shutdown can do it now instead of leaving them for good.
         self._notices: dict[tuple[int, int], asyncio.Task] = {}
 
     # --- lifecycle ---------------------------------------------------------
@@ -273,26 +273,53 @@ class TelegramView:
         except Exception as exc:
             log.warning("group notice failed: %s", exc)
             return
-        message_id = getattr(sent, "message_id", None)
-        if message_id is None:
+        self.expire(chat_id, getattr(sent, "message_id", None), self._notice_ttl)
+
+    def expire(self, chat_id: int, message_id: int | None, ttl: float) -> None:
+        """Delete one of the bot's OWN messages after `ttl` seconds.
+
+        Housekeeping, not moderation, so dry-run does not hold it back: the
+        bot tidying up after itself changes nothing about anyone's standing.
+        """
+        if message_id is None or not ttl:
             return
 
         async def _expire() -> None:
             try:
-                await asyncio.sleep(self._notice_ttl)
+                await asyncio.sleep(ttl)
                 await self._bot.delete_message(chat_id=chat_id, message_id=message_id)
             except asyncio.CancelledError:
                 raise
             except Exception as exc:
-                log.warning("could not remove group notice: %s", exc)
+                log.warning("could not remove bot message: %s", exc)
             finally:
                 self._notices.pop((chat_id, message_id), None)
 
         self._notices[(chat_id, message_id)] = asyncio.create_task(_expire())
 
+    async def remove_service_message(self, chat_id: int, message_id: int) -> bool:
+        """Delete a service line such as "X added Qalqon". Like expire(), this
+        is housekeeping, so it runs in dry-run too."""
+        try:
+            await self._bot.delete_message(chat_id=chat_id, message_id=message_id)
+            return True
+        except Exception as exc:
+            # Usual cause: added before being promoted, so no delete right yet.
+            log.info("could not remove service message in %s: %s", chat_id, exc)
+            return False
+
+    async def leave_chat(self, chat_id: int) -> bool:
+        """Take the bot out of a group. Not moderation, so not dry-run gated."""
+        try:
+            await self._bot.leave_chat(chat_id=chat_id)
+            return True
+        except Exception as exc:
+            log.warning("leave failed for %s: %s", chat_id, exc)
+            return False
+
     async def clear_notices(self) -> None:
-        """At shutdown: remove pending notices now. Their timers die with the
-        process, and a notice nobody removes stays in the group for good."""
+        """At shutdown: remove pending bot messages now. Their timers die with
+        the process, and a message nobody removes stays in the group for good."""
         pending, self._notices = self._notices, {}
         for (chat_id, message_id), task in pending.items():
             task.cancel()

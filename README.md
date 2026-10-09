@@ -408,6 +408,8 @@ AUTONOMY=assisted          # report | assisted | autonomous
 HEARTBEAT_INTERVAL=86400   # seconds between proof-of-life pings (0 disables)
 DIGEST_INTERVAL=21600      # seconds between digest summaries (6h)
 GROUP_NOTICE_TTL=60        # removal notice in the group lasts this long (0 = none)
+GROUP_REPLY_TTL=60         # bot replies to commands in a group last this long (0 = keep)
+CONTROL_PORT=8090          # private bot port the dashboard sends actions to (never publish)
 BLOCKED_DOMAINS=           # comma-separated, always red-flagged
 FLOOD_MESSAGES=5           # messages per user...
 FLOOD_WINDOW=8             # ...within this many seconds = a flood
