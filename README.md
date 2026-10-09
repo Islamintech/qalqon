@@ -683,8 +683,10 @@ rights are changed in Telegram's own UI, which tells the bot nothing:
 Fix: Ban users. Then send /start again.
 ```
 
-The same card is sent **unprompted the moment the bot is added**, since that is
-the one time the admin is certainly looking. It is registered in a second
+The same card is sent **unprompted the moment the bot is added**, but to
+`ADMIN_CHAT_ID` (with the group id), not into the group: members should not
+watch a permissions checklist scroll past. With no admin chat configured it is
+only logged. `/start` in the group still answers there. It is registered in a second
 handler group: PTB runs only the first matching handler per group, and joiner
 screening already claims that update.
 

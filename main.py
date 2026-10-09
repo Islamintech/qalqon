@@ -200,7 +200,9 @@ def main() -> None:
         admin_cache=AdminCache(ttl=settings.admin_cache_ttl),
         skip_group_admins=settings.skip_group_admins,
     )
-    onboarding = OnboardingController(view, settings.web_base_url)
+    onboarding = OnboardingController(
+        view, settings.web_base_url, settings.admin_chat_id
+    )
     admin = AdminController(
         store, view, settings.admin_chat_id, digest=digest, model=model
     )

@@ -153,14 +153,30 @@ async def test_a_failed_rights_lookup_does_not_claim_the_group_is_ready():
 
 # --- arriving in a group ------------------------------------------------
 @pytest.mark.asyncio
-async def test_setup_card_is_sent_unprompted_when_the_bot_is_added():
+async def test_setup_card_goes_to_the_admin_chat_not_the_group():
+    bot = FakeBot()
+    msg = FakeMessage(text="", chat_id=-1001)
+    msg.new_chat_members = [FakeUser(user_id=bot.id, username="qalqon", is_bot=True)]
+    update = FakeUpdate(msg, chat_id=-1001, chat_type="supergroup")
+    await OnboardingController(FakeView(), admin_chat_id="999").on_added(
+        update, FakeContext(bot)
+    )
+
+    assert msg.replies == [], "members should not see a setup checklist"
+    [(chat, text, _)] = bot.sent
+    assert chat == "999"
+    assert "Qalqon setup" in text and "-1001" in text
+
+
+@pytest.mark.asyncio
+async def test_without_an_admin_chat_the_install_is_silent_in_the_group():
     bot = FakeBot()
     msg = FakeMessage(text="", chat_id=-1001)
     msg.new_chat_members = [FakeUser(user_id=bot.id, username="qalqon", is_bot=True)]
     update = FakeUpdate(msg, chat_id=-1001, chat_type="supergroup")
     await OnboardingController(FakeView()).on_added(update, FakeContext(bot))
 
-    assert msg.replies and "Qalqon setup" in msg.replies[0]
+    assert msg.replies == [] and bot.sent == []
 
 
 @pytest.mark.asyncio
@@ -169,6 +185,8 @@ async def test_another_member_joining_is_not_an_install():
     msg = FakeMessage(text="", chat_id=-1001)
     msg.new_chat_members = [FakeUser(user_id=4242, username="someone")]
     update = FakeUpdate(msg, chat_id=-1001, chat_type="supergroup")
-    await OnboardingController(FakeView()).on_added(update, FakeContext(bot))
+    await OnboardingController(FakeView(), admin_chat_id="999").on_added(
+        update, FakeContext(bot)
+    )
 
-    assert msg.replies == []
+    assert msg.replies == [] and bot.sent == []

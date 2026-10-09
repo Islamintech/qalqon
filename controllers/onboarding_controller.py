@@ -81,8 +81,11 @@ def invite_markup(username: str, privacy_url: str = "") -> InlineKeyboardMarkup 
 
 
 class OnboardingController:
-    def __init__(self, view=None, web_base_url: str = "") -> None:
+    def __init__(
+        self, view=None, web_base_url: str = "", admin_chat_id: str = ""
+    ) -> None:
         self._view = view
+        self._admin_chat_id = admin_chat_id
         self._privacy_url = f"{web_base_url.rstrip('/')}/privacy" if web_base_url else ""
 
     # --- entry points ----------------------------------------------------
@@ -106,9 +109,11 @@ class OnboardingController:
     async def on_added(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Sent when Qalqon itself is the new member.
 
-        Unprompted on purpose: an admin who has just added a bot is looking at
-        the chat right now, and will not be looking again in ten minutes when
-        they would otherwise discover it never worked.
+        Unprompted on purpose: a bot that was added but cannot act looks
+        exactly like a bot with nothing to do, so someone must be told now.
+        But told in the ADMIN chat, not the group: members should not watch
+        a permissions checklist scroll past. An admin who wants it in the
+        group can still ask with /start.
         """
         msg = update.effective_message
         chat = update.effective_chat
@@ -117,7 +122,16 @@ class OnboardingController:
         me = getattr(context.bot, "id", None)
         if not any(getattr(m, "id", None) == me for m in msg.new_chat_members):
             return
-        await msg.reply_text(await self._readiness(context.bot, chat))
+        card = await self._readiness(context.bot, chat)
+        if not self._admin_chat_id:
+            log.info("added to %s; no ADMIN_CHAT_ID for the setup card:\n%s", chat.id, card)
+            return
+        try:
+            await context.bot.send_message(
+                chat_id=self._admin_chat_id, text=f"{card}\n\nGroup id: {chat.id}"
+            )
+        except Exception as exc:
+            log.warning("setup card for %s not delivered: %s", chat.id, exc)
 
     # --- the check -------------------------------------------------------
     async def _readiness(self, bot, chat) -> str:
