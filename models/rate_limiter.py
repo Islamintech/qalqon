@@ -88,6 +88,20 @@ class TokenBucket:
         self._available = min(float(self._limit), self._available - float(tokens))
         self.tokens_spent += int(tokens)
 
+    def try_acquire(self, tokens: int) -> bool:
+        """Take the tokens if they fit RIGHT NOW, without waiting. For a
+        caller with somewhere else to go: a fallback model is better than a
+        queue."""
+        if not self.enabled:
+            return True
+        want = min(float(max(tokens, 0)), float(self._limit))
+        self._refill()
+        if self._available + _EPSILON >= want:
+            self._available -= want
+            self.tokens_spent += int(tokens)
+            return True
+        return False
+
     async def acquire(self, tokens: int) -> None:
         if not self.enabled:
             return

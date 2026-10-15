@@ -10,7 +10,7 @@ from telegram.ext import (
 
 from config import control_secret, settings
 from models import (
-    KeywordFilter, LLMClient, ProfileAnalyzer, VisionClient, FileScanner,
+    Fallback, KeywordFilter, LLMClient, ProfileAnalyzer, VisionClient, FileScanner,
     ChannelAnalyzer, MTProtoScanner, Policy, Store, LinkAnalyzer,
     BurstDetector, AdminCache, Autonomy, ModerationModel,
 )
@@ -177,6 +177,13 @@ def main() -> None:
             settings.groq_api_key, settings.groq_model,
             cache_ttl=settings.llm_cache_ttl,
             token_limit_per_minute=settings.groq_token_limit_per_minute,
+            fallback_models=settings.groq_fallback_models,
+            fallback=Fallback(
+                base_url=settings.fallback_llm_base_url,
+                api_key=settings.fallback_llm_api_key,
+                model=settings.fallback_llm_model,
+                token_limit_per_minute=settings.fallback_llm_token_limit_per_minute,
+            ),
         ),
         profile_analyzer=profile_analyzer,
         link_analyzer=LinkAnalyzer(blocklist=settings.blocked_domains),

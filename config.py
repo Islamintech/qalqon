@@ -22,6 +22,26 @@ class Settings:
     # review) where the general models jump to RED_FLAG (-> action).
     # openai/gpt-oss-120b is the stronger general alternative.
     groq_model: str = os.getenv("GROQ_MODEL", "openai/gpt-oss-safeguard-20b")
+    # More Groq models to try, in order, when GROQ_MODEL is rate-limited or
+    # down, comma-separated. The free tier limits each model separately, so
+    # every model listed adds its own tokens-per-minute and requests-per-day.
+    groq_fallback_models: tuple = tuple(
+        m.strip() for m in os.getenv("GROQ_FALLBACK_MODELS", "").split(",")
+        if m.strip()
+    )
+
+    # A second provider, tried after every Groq model has failed — so a Groq
+    # outage is not a model outage. Any OpenAI-compatible endpoint works, e.g.
+    #   Cerebras  https://api.cerebras.ai/v1                          gpt-oss-120b
+    #   Gemini    https://generativelanguage.googleapis.com/v1beta/openai  gemini-2.5-flash
+    # Leave the key empty to disable.
+    fallback_llm_base_url: str = os.getenv("FALLBACK_LLM_BASE_URL", "")
+    fallback_llm_api_key: str = os.getenv("FALLBACK_LLM_API_KEY", "")
+    fallback_llm_model: str = os.getenv("FALLBACK_LLM_MODEL", "")
+    # 0 = no local pacing; the provider's own 429 still sends us onward.
+    fallback_llm_token_limit_per_minute: int = int(
+        os.getenv("FALLBACK_LLM_TOKEN_LIMIT_PER_MINUTE", "0")
+    )
 
     # Free Hugging Face token for profile-photo NSFW screening (phase 2).
     # Leave empty to skip photo analysis entirely.

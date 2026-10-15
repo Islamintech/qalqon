@@ -27,6 +27,7 @@ import re
 import time
 from dataclasses import dataclass
 
+import httpx
 from groq import AsyncGroq
 
 from .rate_limiter import TokenBucket
@@ -141,6 +142,44 @@ def _retryable(exc: Exception) -> bool:
     return any(token in blob for token in _RETRYABLE)
 
 
+def _parse_json(content: str) -> dict:
+    """The verdict object, even when a provider without strict JSON mode wraps
+    it in a ```json fence or a sentence."""
+    try:
+        return json.loads(content)
+    except (TypeError, ValueError):
+        match = re.search(r"\{.*\}", content or "", re.S)
+        if not match:
+            raise
+        return json.loads(match.group(0))
+
+
+@dataclass
+class Backend:
+    """One model to ask. Free tiers limit each MODEL separately, so every
+    backend carries its own bucket: gpt-oss-20b being out of tokens this
+    minute says nothing about gpt-oss-120b."""
+
+    label: str
+    model: str
+    bucket: TokenBucket
+    groq: AsyncGroq | None = None
+    # Any OpenAI-compatible endpoint (Cerebras, Gemini, OpenRouter...), used
+    # when `groq` is None.
+    base_url: str = ""
+    api_key: str = ""
+
+
+@dataclass
+class Fallback:
+    """A second provider, tried after every Groq model has failed."""
+
+    base_url: str
+    api_key: str
+    model: str
+    token_limit_per_minute: int = 0
+
+
 class LLMClient:
     def __init__(
         self,
@@ -151,18 +190,32 @@ class LLMClient:
         max_concurrency: int = 4,
         max_attempts: int = 3,
         token_limit_per_minute: int = 0,
+        fallback_models: tuple[str, ...] = (),
+        fallback: Fallback | None = None,
+        timeout: float = 30.0,
     ) -> None:
-        self._client = AsyncGroq(api_key=api_key)
+        groq = AsyncGroq(api_key=api_key)
         self._model = model
+        self._timeout = timeout
+        # Tried in order. Concurrency is not a budget: four in flight at ~0.8s
+        # a call is some 290 requests a minute, against a free-tier ceiling
+        # nearer eight. The buckets are what actually enforce the limit; the
+        # semaphore just stops us opening sockets we cannot use.
+        self._backends: list[Backend] = [
+            Backend(f"groq:{m}", m, TokenBucket(token_limit_per_minute), groq=groq)
+            for m in dict.fromkeys([model, *fallback_models]) if m
+        ]
+        if fallback and fallback.base_url and fallback.api_key and fallback.model:
+            self._backends.append(Backend(
+                f"fallback:{fallback.model}", fallback.model,
+                TokenBucket(fallback.token_limit_per_minute),
+                base_url=fallback.base_url.rstrip("/"), api_key=fallback.api_key,
+            ))
+        self._bucket = self._backends[0].bucket
         self._ttl = cache_ttl
         self._max = cache_size
         self._cache: dict[str, tuple[float, Verdict]] = {}
         self._sem = asyncio.Semaphore(max_concurrency)
-        # Concurrency is not a budget: four in flight at ~0.8s a call is
-        # some 290 requests a minute, against a free-tier ceiling nearer
-        # eight. The bucket is what actually enforces the limit; the
-        # semaphore just stops us opening sockets we cannot use.
-        self._bucket = TokenBucket(token_limit_per_minute)
         self._max_attempts = max(max_attempts, 1)
         self.calls = 0
         self.cache_hits = 0
@@ -196,59 +249,116 @@ class LLMClient:
         self._cache[key] = (time.monotonic(), verdict)
 
     async def _call(self, user_content: str) -> Verdict:
-        """One analysis with retries. Raises if every attempt failed."""
+        """One analysis, falling through the backends in order. Raises only if
+        every one of them failed."""
         started = time.perf_counter()
-        last: Exception | None = None
+        errors: list[str] = []
         self._last_attempts = 0
-        for attempt in range(self._max_attempts):
-            self._last_attempts = attempt + 1
+        for i, backend in enumerate(self._backends):
+            last_backend = i == len(self._backends) - 1
             try:
-                estimate = _estimate_tokens(SYSTEM_PROMPT, user_content)
-                # Wait for room rather than discover the ceiling as a 429. A
-                # call delayed two seconds succeeds; the same call sent now is
-                # three retries and a verdict marked degraded.
-                await self._bucket.acquire(estimate)
+                return await self._call_backend(
+                    backend, user_content, started, patient=last_backend
+                )
+            except Exception as exc:
+                errors.append(f"{backend.label}: {exc}")
+                if not last_backend:
+                    log.warning("llm %s failed (%s) — trying %s",
+                                backend.label, exc, self._backends[i + 1].label)
+        raise RuntimeError(" | ".join(errors) or "llm call failed")
+
+    async def _call_backend(
+        self, backend: Backend, user_content: str, started: float, patient: bool
+    ) -> Verdict:
+        """One backend, with retries. Only the LAST backend waits: with another
+        model to try, a rate limit means "ask the next one now", not "back off
+        and ask this one again in four seconds"."""
+        estimate = _estimate_tokens(SYSTEM_PROMPT, user_content)
+        if not patient and not backend.bucket.try_acquire(estimate):
+            raise RuntimeError("local token budget for this minute is spent")
+        last: Exception | None = None
+        attempts = self._max_attempts if patient else 1
+        for attempt in range(attempts):
+            self._last_attempts += 1
+            try:
+                if patient:
+                    # Wait for room rather than discover the ceiling as a
+                    # 429. A call delayed two seconds succeeds; the same call
+                    # sent now is three retries and a verdict marked degraded.
+                    await backend.bucket.acquire(estimate)
                 async with self._sem:
                     self.calls += 1
-                    resp = await self._client.chat.completions.create(
-                        model=self._model,
-                        temperature=0,
-                        max_tokens=_MAX_COMPLETION_TOKENS,
-                        response_format={"type": "json_object"},
-                        messages=[
-                            {"role": "system", "content": SYSTEM_PROMPT},
-                            {"role": "user", "content": user_content},
-                        ],
-                    )
-                usage = getattr(resp, "usage", None)
-                details = getattr(usage, "completion_tokens_details", None)
-                self.last = CallStats(
-                    model=getattr(resp, "model", self._model),
-                    prompt_tokens=getattr(usage, "prompt_tokens", 0) or 0,
-                    completion_tokens=getattr(usage, "completion_tokens", 0) or 0,
-                    reasoning_tokens=getattr(details, "reasoning_tokens", 0) or 0,
-                    latency_ms=int((time.perf_counter() - started) * 1000),
-                    queue_ms=int((getattr(usage, "queue_time", 0) or 0) * 1000),
+                    content, stats = await self._complete(backend, user_content)
+                stats.latency_ms = int((time.perf_counter() - started) * 1000)
+                self.last = stats
+                backend.bucket.charge(
+                    stats.prompt_tokens + stats.completion_tokens - estimate
                 )
-                self._bucket.charge(
-                    self.last.prompt_tokens + self.last.completion_tokens - estimate
-                )
-                data = json.loads(resp.choices[0].message.content)
+                data = _parse_json(content)
                 risk = Risk(str(data.get("risk", "CLEAN")).upper())
                 return Verdict(risk, str(data.get("reason", ""))[:200], "llm")
             except Exception as exc:
                 last = exc
-                if attempt + 1 >= self._max_attempts or not _retryable(exc):
+                if attempt + 1 >= attempts or not _retryable(exc):
                     break
                 # Jittered backoff so a raid's worth of retries don't resynchronize
                 # into another thundering herd.
                 delay = (2**attempt) + random.uniform(0, 0.5)
                 log.warning(
-                    "llm attempt %s/%s failed (%s) — retrying in %.1fs",
-                    attempt + 1, self._max_attempts, exc, delay,
+                    "llm %s attempt %s/%s failed (%s) — retrying in %.1fs",
+                    backend.label, attempt + 1, attempts, exc, delay,
                 )
                 await asyncio.sleep(delay)
         raise last if last else RuntimeError("llm call failed")
+
+    async def _complete(self, backend: Backend, user_content: str):
+        """Send the request; return the reply text and what it cost."""
+        messages = [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": user_content},
+        ]
+        if backend.groq is not None:
+            resp = await backend.groq.chat.completions.create(
+                model=backend.model,
+                temperature=0,
+                max_tokens=_MAX_COMPLETION_TOKENS,
+                response_format={"type": "json_object"},
+                messages=messages,
+            )
+            usage = getattr(resp, "usage", None)
+            details = getattr(usage, "completion_tokens_details", None)
+            return resp.choices[0].message.content, CallStats(
+                model=getattr(resp, "model", backend.model),
+                prompt_tokens=getattr(usage, "prompt_tokens", 0) or 0,
+                completion_tokens=getattr(usage, "completion_tokens", 0) or 0,
+                reasoning_tokens=getattr(details, "reasoning_tokens", 0) or 0,
+                queue_ms=int((getattr(usage, "queue_time", 0) or 0) * 1000),
+            )
+
+        # Plain OpenAI-compatible HTTP: one shape fits Cerebras, Gemini and
+        # OpenRouter, without a second SDK to keep in step.
+        async with httpx.AsyncClient(timeout=self._timeout) as http:
+            r = await http.post(
+                f"{backend.base_url}/chat/completions",
+                headers={"Authorization": f"Bearer {backend.api_key}"},
+                json={
+                    "model": backend.model,
+                    "temperature": 0,
+                    "max_completion_tokens": _MAX_COMPLETION_TOKENS,
+                    "response_format": {"type": "json_object"},
+                    "messages": messages,
+                },
+            )
+            r.raise_for_status()
+            data = r.json()
+        usage = data.get("usage") or {}
+        details = usage.get("completion_tokens_details") or {}
+        return data["choices"][0]["message"]["content"], CallStats(
+            model=data.get("model") or backend.model,
+            prompt_tokens=usage.get("prompt_tokens") or 0,
+            completion_tokens=usage.get("completion_tokens") or 0,
+            reasoning_tokens=details.get("reasoning_tokens") or 0,
+        )
 
     async def analyze(self, text: str, context: str = "") -> Verdict:
         # The context is part of the QUESTION, so it belongs in the key rather
