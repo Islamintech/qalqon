@@ -251,6 +251,38 @@ async def test_admin_button_bans(store, bot):
     assert (await store.get(-1001, 100)).status == STATUS_BANNED
 
 
+async def test_refused_ban_is_reported_not_recorded(store, bot):
+    """If Telegram refuses the ban, the admin must hear so — not 'banned 🚫'."""
+    bot.admins.add(555)
+
+    async def refuse(chat_id, user_id):
+        raise RuntimeError("Not enough rights to restrict/unrestrict chat member")
+
+    bot.ban_chat_member = refuse
+    controller, view = build(store, FakeLLM(), FakeProfiles(), bot=bot)
+    admin = AdminController(store, view, admin_chat_id="999",
+                            model=controller.model)
+    answered = []
+
+    class Query:
+        data = build_callback("ban", -1001, 100)
+        message = FakeMessage(text="alert")
+        edited = None
+
+        async def answer(self, text=None, show_alert=False):
+            answered.append(text)
+
+        async def edit_message_text(self, text):
+            self.edited = text
+
+    query = Query()
+    update = FakeUpdate(user=FakeUser(555, "boss"), chat_id=-1001, callback_query=query)
+    await admin.on_button(update, FakeContext(bot))
+    assert "refused" in answered[0]
+    assert query.edited is None, "buttons must stay so the admin can retry"
+    assert (await store.get(-1001, 100)).status != STATUS_BANNED
+
+
 async def test_ignore_button_clears_strikes(store, bot):
     """A false positive must not leave a strike that escalates the next one."""
     bot.admins.add(555)

@@ -259,6 +259,24 @@ class AdminController:
         # overturned us; this only reports the outcome back to the tapper.
         by = update.effective_user
         self._view.attach(context.bot)
+        # Act on Telegram FIRST. Recording "banned" and stamping the alert when
+        # the ban was refused (bot not an admin, no ban right, target is an
+        # admin) told the tapper it worked while the user stayed in the group.
+        if verb == VERB_BAN:
+            acted = await self._view.kick_user(chat_id, user_id)
+        elif verb == VERB_UNBAN:
+            acted = await self._view.unban_user(chat_id, user_id)
+        else:
+            acted = True
+        if not acted:
+            await query.answer(
+                f"Telegram refused the {verb} — check the bot is an admin in "
+                "that group with the 'Ban users' right, and that the target "
+                "is not an admin.",
+                show_alert=True,
+            )
+            return
+
         note = await self._model.resolve(
             chat_id, user_id, verb,
             by_user_id=by.id, by_username=by.username or "",
@@ -266,12 +284,11 @@ class AdminController:
         if note is None:
             await query.answer("unknown action")
             return
-        if verb == VERB_BAN:
-            await self._view.kick_user(chat_id, user_id)
-        elif verb == VERB_UNBAN:
-            await self._view.unban_user(chat_id, user_id)
+        if verb in (VERB_BAN, VERB_UNBAN) and self._view.dry_run:
+            # Dry-run only logs the ban. Say so, or "banned" reads as done.
+            note = f"{note} (DRY-RUN — not applied; /dryrun off to go live)"
 
-        await query.answer(note)
+        await query.answer(note, show_alert=self._view.dry_run)
         try:
             # Stamp the outcome onto the alert and drop the buttons, so the same
             # case can't be resolved twice by two admins.

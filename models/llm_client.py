@@ -119,6 +119,12 @@ def _normalize(text: str) -> str:
 # pacing exists to prevent and the difference is settled afterwards anyway.
 _COMPLETION_ALLOWANCE = 250
 
+# Hard cap on the reply, reasoning included. Without one Groq reserves ~1500
+# completion tokens per request against the per-minute budget, so a single
+# call "requests" ~2200 tokens and is refused outright (413) on a model whose
+# limit is 2000 TPM — gpt-oss-safeguard-20b on the free tier.
+_MAX_COMPLETION_TOKENS = 500
+
 
 def _estimate_tokens(system: str, user: str) -> int:
     """Roughly what this call will cost, BEFORE it is sent.
@@ -207,6 +213,7 @@ class LLMClient:
                     resp = await self._client.chat.completions.create(
                         model=self._model,
                         temperature=0,
+                        max_tokens=_MAX_COMPLETION_TOKENS,
                         response_format={"type": "json_object"},
                         messages=[
                             {"role": "system", "content": SYSTEM_PROMPT},
