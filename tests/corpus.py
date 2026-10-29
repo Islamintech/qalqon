@@ -31,6 +31,10 @@ LEGITIMATE = [
     # work announcements (ru)
     "Завтра есть работа в Ансане, нужно 3 человека. 130 тысяч вон за день.",
     "Кто свободен завтра? Есть подработка на складе",
+    "В субботу переезд в Инчхоне, нужен помощник на 4 часа, 80 тысяч вон.",
+    "Нужны 2 человека на завод в Хвасоне, 12 часов, 150 тысяч вон в день. Пишите в лс.",
+    "Кто знает, где сделать банковскую карту иностранцу? В какой банк идти?",
+    "Ищу попутчика до Сеула в воскресенье, бензин пополам.",
     # currency exchange (uz)
     "Won bor, so'mga almashtiraman. Kurs 1000 won = 10.900 so'm. Bank orqali.",
     "So'm kerak edi, kimda bor? Karta orqali o'tkazaman",
@@ -57,6 +61,15 @@ SCAMS = [
     # profile bait / solicitation
     "Mening profilimni ko'ring, sizga yoqadi",
     "check out my profile, you will like what you see",
+    # vague paid "task" — courier / money-mule recruitment
+    "Нужно помочь с организацией передвижения по городу. До 12 000",
+    "Нужен человек для простых поручений по городу, от 15 000 в день. Подробности в ЛС",
+    # russian mass-spam templates
+    "Нужны люди, доход от 5000 в день, пиши + в лс",
+    "Подработка без опыта, 18+, все подробности в личке",
+    "Аренда карт, хорошо плачу, пишите",
+    "Ищем дропов, оплата каждый день",
+    "Лёгкий заработок без вложений, пиши в лс",
     # phishing link
     "Pulingizni tekshiring: kb-bank-verify.top/login",
 ]

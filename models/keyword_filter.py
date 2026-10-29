@@ -60,6 +60,18 @@ SCAM_PATTERNS: list[str] = [
     r"\bсначала\b.{0,20}\b(переве|оплат|отправ)",
     # uz: "avval siz o'tkazing/yuboring" — you go first
     rf"\bavval\s+siz\b.{{0,25}}\b(o{APO}tkaz|yubor|to{APO}la)",
+    # --- money-mule and courier recruitment (ru) ---------------------------
+    # The words themselves are the trade's jargon: nobody rents out a bank
+    # card or hires "drops" in the ordinary course of a work group.
+    r"\bаренд\w*\b.{0,15}\bкарт",
+    r"\b(куплю|скупаю|продам|продаю)\b.{0,20}\b(банковск\w*|дебетов\w*)\s+карт",
+    r"\bобнал\w*",
+    r"\bдроп(ы|ов|ам|а)?\b",
+    r"\bзакладк\w*",
+    r"\bпробив\w*",
+    # ru: "лёгкий заработок", "быстрые деньги", "заработок без вложений"
+    r"\b(л[её]гк\w*|быстр\w*)\s+(заработ|деньг|доход)",
+    r"\bбез\s+вложени",
 ]
 
 
