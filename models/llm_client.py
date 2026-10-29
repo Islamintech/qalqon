@@ -69,7 +69,9 @@ WHAT IS ORDINARY IN THESE GROUPS. Never raise risk for the topic alone:
 - Person-to-person currency exchange between Korean won (KRW) and Uzbek so'm
   (UZS): offering to exchange, asking today's rate, stating how much one holds
   ("who needs so'm? I have 5 million"), and settling by bank or card transfer.
-  This is a normal, expected activity in these groups.
+  This is a normal, expected activity in these groups. Someone looking to
+  BUY currency and offering to pay by card themselves is asking for nothing
+  up front — that is never a scam.
 - Sharing a phone number, or asking to continue privately, for either of the
   above.
 
@@ -87,6 +89,32 @@ WHAT MAKES SOMETHING A SCAM. The subject is never the signal — the ASK is:
   something.
 - Links imitating a bank, exchange or government site; requests for card
   numbers, passwords or verification codes.
+- A vague paid "task" that never says what the work actually is, where, or
+  for whom: "need help organizing movement around the city, up to 12 000",
+  "simple errand in the city, good pay, details in DM". This is how couriers
+  and money mules are recruited. The test is whether the KIND of work is
+  named: "work at a factory, call me" is an ordinary post even with no wage
+  or address, because it says what the job is. At least FIFTY_FIFTY;
+  RED_FLAG if it also steers to private messages or promises high pay for
+  little effort.
+
+RUSSIAN-LANGUAGE SPAM. Members write in Russian too, so the language itself
+is never a signal — but most mass spam in these groups arrives in Russian, in
+a few recognisable templates. Read Russian messages for these specifically:
+
+- Vague well-paid work with no employer, place or task named, pushed to
+  private messages: "Нужны люди, доход от 5000 в день, пиши + в лс",
+  "Подработка без опыта, 18+, подробности в личке", "Ищу партнёров".
+- Courier and "drop" recruitment: "курьер", "закладки", "дропы", "нужен
+  человек забрать и передать".
+- Renting, buying or "borrowing" bank cards or accounts, or cash-out
+  schemes: "аренда карт", "куплю банковскую карту", "обнал", "пробив".
+- Easy-money promises: "лёгкий заработок", "заработок без вложений",
+  "пассивный доход".
+
+A Russian job post that names the work, the place and the wage ("Завтра
+работа в Ансане на складе, 130 тысяч вон"), or an ordinary exchange offer,
+is as normal as its Uzbek equivalent.
 
 RISK LEVELS
 RED_FLAG    — clearly matches one of the scam patterns above.
@@ -106,7 +134,9 @@ Respond with ONLY a JSON object, no prose, no markdown:
 
 # Errors worth retrying: rate limits and transient server-side failures.
 _RETRYABLE = ("429", "rate limit", "rate_limit", "500", "502", "503", "504",
-              "timeout", "timed out", "connection")
+              "timeout", "timed out", "connection",
+              # an empty or truncated reply; sampling again usually completes
+              "json_validate_failed")
 
 
 def _normalize(text: str) -> str:
@@ -124,7 +154,18 @@ _COMPLETION_ALLOWANCE = 250
 # completion tokens per request against the per-minute budget, so a single
 # call "requests" ~2200 tokens and is refused outright (413) on a model whose
 # limit is 2000 TPM — gpt-oss-safeguard-20b on the free tier.
-_MAX_COMPLETION_TOKENS = 500
+#
+# Not lower: at 500, gpt-oss at its default effort spent the whole cap on
+# reasoning in 3 of 5 calls and returned nothing, which Groq rejects as
+# json_validate_failed — a dropped verdict, not a cheaper one.
+_MAX_COMPLETION_TOKENS = 1000
+
+# gpt-oss reasons at "medium" unless told otherwise. A three-way label does not
+# need it: at "low" the same message cost ~75 completion tokens instead of
+# ~350 and gave the same answer every time, where medium wavered between
+# RED_FLAG and FIFTY_FIFTY. Other models reject the parameter, so it is sent
+# only to gpt-oss.
+_LOW_EFFORT_PREFIXES = ("openai/gpt-oss", "gpt-oss")
 
 
 def _estimate_tokens(system: str, user: str) -> int:
@@ -317,6 +358,10 @@ class LLMClient:
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": user_content},
         ]
+        effort = (
+            {"reasoning_effort": "low"}
+            if backend.model.startswith(_LOW_EFFORT_PREFIXES) else {}
+        )
         if backend.groq is not None:
             resp = await backend.groq.chat.completions.create(
                 model=backend.model,
@@ -324,6 +369,8 @@ class LLMClient:
                 max_tokens=_MAX_COMPLETION_TOKENS,
                 response_format={"type": "json_object"},
                 messages=messages,
+                # Through extra_body: the pinned SDK predates the parameter.
+                extra_body=effort or None,
             )
             usage = getattr(resp, "usage", None)
             details = getattr(usage, "completion_tokens_details", None)
@@ -347,6 +394,7 @@ class LLMClient:
                     "max_completion_tokens": _MAX_COMPLETION_TOKENS,
                     "response_format": {"type": "json_object"},
                     "messages": messages,
+                    **effort,
                 },
             )
             r.raise_for_status()

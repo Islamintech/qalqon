@@ -318,7 +318,7 @@ def page(logo: str, signed_in: bool, theme: str = "",
   <div class="facts">
     <div class="fact"><b>6</b><span>independent signals</span></div>
     <div class="fact"><b>∞</b><span>languages</span></div>
-    <div class="fact"><b>475</b><span>automated tests</span></div>
+    <div class="fact"><b>483</b><span>automated tests</span></div>
     <div class="fact"><b>&lt;1s</b><span>typical decision</span></div>
   </div>
 </div></div>
